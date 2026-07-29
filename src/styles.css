@@ -35,6 +35,8 @@ button { cursor: pointer; }
 .button:hover { color: #ffffff; background: #ffffff13; }
 .button.icon { padding: 0; color: #9298ac; font-size: 18px; font-weight: 400; }
 .button.share { color: #baf0cf; border-color: #baf0cf18; }
+.button.import.done { color: #baf0cf; }
+.button.import.error { color: #fa8a87; }
 
 .workspace {
   width: min(1100px, 100%);

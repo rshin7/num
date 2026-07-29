@@ -9,7 +9,7 @@ It is an independent open-source project, released under the Apache License 2.0.
 - Exact base-10 calculations with C# `decimal`, including money amounts.
 - Variables, parentheses, percentages, `abs`, `round`, `min`, and `max`.
 - Currency-aware `$`, `€`, `£`, and `¥` arithmetic.
-- Notes with `#`, local browser persistence, compressed URL sharing, and JSON export.
+- Notes with `#`, local browser persistence, compressed URL sharing, and JSON import/export.
 - A responsive editor/results layout for desktop and mobile screens.
 
 ## Requirements
@@ -50,7 +50,7 @@ Assignments set variables but do not add to the running total. Ordinary expressi
 
 ## Data and sharing
 
-The active workbook is stored in the browser's `localStorage`; Num has no account system or database. **Share** compresses the workbook into the URL fragment, so the fragment is self-contained and is not sent to a web server. The link therefore changes when its contents change. For large workbooks, use the download control to export JSON.
+The active workbook is stored in the browser's `localStorage`; Num has no account system or database. **Share** compresses the workbook into the URL fragment, so the fragment is self-contained and is not sent to a web server. The link therefore changes when its contents change. Use **↓** to export JSON and **↑** to import a previously exported workbook. Imports are validated before replacing the active workbook.
 
 ## Project structure
 
