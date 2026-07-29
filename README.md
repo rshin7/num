@@ -1,6 +1,6 @@
 # Num
 
-Num is a local-first calculator workbook for the browser. Write one expression per line and see results beside it. The interface is React/Vite; the calculator itself runs in a .NET WebAssembly module exposed to JavaScript with `[JSExport]`.
+Num is a local-first calculator workbook for the browser. Write one expression per line and see results beside it. The interface is React/Vite with TypeScript; the calculator itself runs in a .NET WebAssembly module exposed to JavaScript with `[JSExport]`.
 
 It is an independent open-source project, released under the Apache License 2.0.
 
@@ -34,6 +34,7 @@ Open the local address printed by Vite. The calculator begins with a blank workb
 | --- | --- |
 | `npm run dev` | Build the calculator engine and start Vite. |
 | `npm run build` | Create the production site in `dist/`. |
+| `npm run check` | Run strict TypeScript type checking. |
 | `npm run test` | Build the WASM engine and run its integration tests. |
 | `npm run preview` | Serve a completed production build. |
 
@@ -54,7 +55,7 @@ The active workbook is stored in the browser's `localStorage`; Num has no accoun
 
 ## Project structure
 
-- `src/` — React UI, syntax display, sharing helpers, and WASM bridge.
+- `src/` — TypeScript React UI, syntax display, sharing helpers, and WASM bridge.
 - `src/NumEngine/` — .NET decimal expression parser and `[JSExport]` API.
 - `test/` — Node integration tests against the generated WASM export.
 - `public/wasm/` — generated runtime bundle; never commit it.

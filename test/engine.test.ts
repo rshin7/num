@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import type { CalculatorExports, WorkbookEvaluation } from '../src/engine'
 
-await import(new URL('../public/wasm/main.js', import.meta.url))
-await globalThis.numEngineReady
+await import(new URL('../public/wasm/main.js', import.meta.url).href)
 
-function evaluate(source) {
-  return JSON.parse(globalThis.numEngine.EvaluateWorkbook(source))
+const numGlobal = globalThis as typeof globalThis & {
+  numEngine?: CalculatorExports
+  numEngineReady?: Promise<CalculatorExports>
+}
+
+await numGlobal.numEngineReady
+
+function evaluate(source: string): WorkbookEvaluation {
+  const engine = numGlobal.numEngine
+  if (!engine) throw new Error('The WebAssembly calculator did not start.')
+  return JSON.parse(engine.EvaluateWorkbook(source)) as WorkbookEvaluation
 }
 
 test('calculates money with decimal precision and variables', () => {

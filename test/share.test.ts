@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-globalThis.window = { location: { href: 'https://num.example/' } }
+globalThis.window = { location: { href: 'https://num.example/' } } as Window & typeof globalThis
 
-const { readSharedSource, shareUrl, sourceFromWorkbookJson } = await import('../src/share.js')
+const { readSharedSource, shareUrl, sourceFromWorkbookJson } = await import('../src/share')
 
 test('round-trips a workbook through the compressed share fragment', () => {
   const source = 'coffee = $4.50\ncoffee * 2 # morning and afternoon'

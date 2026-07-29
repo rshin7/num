@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./.generated/wasm",
+    "rootDir": "./src/NumEngine",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["src/NumEngine/main.ts"]
+}

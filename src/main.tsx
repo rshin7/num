@@ -1,17 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, type UIEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { evaluateWorkbook } from './engine'
+import { evaluateWorkbook, type WorkbookEvaluation } from './engine'
 import { exportWorkbook, readSharedSource, shareUrl, sourceFromWorkbookJson } from './share'
 import './styles.css'
 
 const STORAGE_KEY = 'num:workbook:v2'
 const MAX_IMPORT_BYTES = 1_000_000
 
-function initialSource() {
+function initialSource(): string {
   return readSharedSource() ?? localStorage.getItem(STORAGE_KEY) ?? ''
 }
 
-function highlight(source) {
+function highlight(source: string) {
   const lines = source.split('\n')
   return lines.map((line, index) => {
     const comment = line.indexOf('#')
@@ -28,16 +28,16 @@ function highlight(source) {
 }
 
 function App() {
-  const [source, setSource] = useState(initialSource)
-  const [workbook, setWorkbook] = useState({ results: [], total: '0' })
-  const [shareState, setShareState] = useState('')
-  const [importState, setImportState] = useState('')
-  const appShellRef = useRef(null)
-  const editorRef = useRef(null)
-  const fileInputRef = useRef(null)
-  const importTimerRef = useRef(null)
-  const overlayRef = useRef(null)
-  const resultsRef = useRef(null)
+  const [source, setSource] = useState<string>(initialSource)
+  const [workbook, setWorkbook] = useState<WorkbookEvaluation>({ results: [], total: '0' })
+  const [shareState, setShareState] = useState<string>('')
+  const [importState, setImportState] = useState<'done' | 'error' | ''>('')
+  const appShellRef = useRef<HTMLElement | null>(null)
+  const editorRef = useRef<HTMLTextAreaElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const importTimerRef = useRef<number | undefined>(undefined)
+  const overlayRef = useRef<HTMLPreElement | null>(null)
+  const resultsRef = useRef<HTMLOutputElement | null>(null)
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -63,57 +63,51 @@ function App() {
     let disposed = false
     evaluateWorkbook(source)
       .then((next) => {
-        if (!disposed) {
-          setWorkbook(next)
-        }
+        if (!disposed) setWorkbook(next)
       })
       .catch(() => {})
     return () => { disposed = true }
   }, [source])
 
-  const lines = useMemo(() => source.split('\n'), [source])
+  const lines = useMemo<string[]>(() => source.split('\n'), [source])
 
-  function syncScroll(event) {
+  function syncScroll(event: UIEvent<HTMLTextAreaElement>): void {
     const { scrollLeft, scrollTop } = event.currentTarget
     if (overlayRef.current) {
       overlayRef.current.scrollTop = scrollTop
       overlayRef.current.scrollLeft = scrollLeft
     }
-    if (resultsRef.current) {
-      resultsRef.current.scrollTop = scrollTop
-    }
+    if (resultsRef.current) resultsRef.current.scrollTop = scrollTop
   }
 
-  async function copyShareLink() {
+  async function copyShareLink(): Promise<void> {
     const url = shareUrl(source)
     try {
       await navigator.clipboard.writeText(url)
-      setShareState(`Link copied · ${url.length} characters`)
+      setShareState('Link copied')
     } catch {
       window.prompt('Copy this local-only share link:', url)
       setShareState('Share link ready')
     }
   }
 
-  function showImportState(nextState) {
+  function showImportState(nextState: 'done' | 'error'): void {
     window.clearTimeout(importTimerRef.current)
     setImportState(nextState)
     importTimerRef.current = window.setTimeout(() => setImportState(''), 2200)
   }
 
-  function openImportPicker() {
+  function openImportPicker(): void {
     fileInputRef.current?.click()
   }
 
-  async function importWorkbook(event) {
+  async function importWorkbook(event: ChangeEvent<HTMLInputElement>): Promise<void> {
     const file = event.target.files?.[0]
     event.target.value = ''
     if (!file) return
 
     try {
-      if (file.size > MAX_IMPORT_BYTES) {
-        throw new Error('This workbook is too large to import.')
-      }
+      if (file.size > MAX_IMPORT_BYTES) throw new Error('This workbook is too large to import.')
 
       const importedSource = sourceFromWorkbookJson(await file.text())
       setSource(importedSource)
@@ -178,4 +172,4 @@ function App() {
   )
 }
 
-createRoot(document.getElementById('root')).render(<App />)
+createRoot(document.getElementById('root')!).render(<App />)

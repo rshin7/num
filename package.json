@@ -6,11 +6,13 @@
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
-    "dev": "npm run build:engine && vite",
-    "build:engine": "MSBuildEnableWorkloadResolver=false DOTNET_CLI_HOME=$PWD/.dotnet-home dotnet build src/NumEngine/NumEngine.csproj -c Debug -p:UseSharedCompilation=false",
-    "build": "npm run build:engine && vite build",
+    "dev": "npm run check && npm run build:engine && vite",
+    "build:wasm-bootstrap": "tsc --project tsconfig.wasm.json",
+    "build:engine": "npm run build:wasm-bootstrap && MSBuildEnableWorkloadResolver=false DOTNET_CLI_HOME=$PWD/.dotnet-home dotnet build src/NumEngine/NumEngine.csproj -c Debug -p:UseSharedCompilation=false && cp .generated/wasm/main.js public/wasm/main.js",
+    "check": "tsc --noEmit",
+    "build": "npm run check && npm run build:engine && vite build",
     "preview": "vite preview",
-    "test": "npm run build:engine && node --test test/engine.test.mjs test/share.test.mjs"
+    "test": "npm run check && npm run build:engine && tsx --test test/*.test.ts"
   },
   "dependencies": {
     "lz-string": "^1.5.0",
@@ -18,7 +20,12 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.0.2",
+    "tsx": "^4.23.1",
+    "typescript": "^7.0.2",
     "vite": "^7.1.7"
   }
 }

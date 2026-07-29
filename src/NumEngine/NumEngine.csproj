@@ -6,7 +6,6 @@
     <InvariantGlobalization>true</InvariantGlobalization>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);CA1416</NoWarn>
-    <WasmMainJSPath>main.js</WasmMainJSPath>
     <WasmEmitAppBundle>true</WasmEmitAppBundle>
     <WasmAppDir>$(MSBuildProjectDirectory)/../../public/wasm/</WasmAppDir>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -44,9 +43,6 @@
     </ItemGroup>
   </Target>
   <Target Name="GenerateCalculatorAppBundle" AfterTargets="Build" DependsOnTargets="_InitializeCommonProperties;PrepareInputsForWasmBuild">
-    <ItemGroup>
-      <WasmExtraFilesToDeploy Include="$(WasmMainJSPath)" />
-    </ItemGroup>
     <RemoveDir Directories="$(WasmAppDir)" />
     <WasmAppBuilder
       AppDir="$(WasmAppDir)"

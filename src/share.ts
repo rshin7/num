@@ -5,7 +5,12 @@ const { compressToEncodedURIComponent, decompressFromEncodedURIComponent } = LZS
 const HASH_KEY = 'n='
 const WORKBOOK_VERSION = 1
 
-export function readSharedSource() {
+export interface WorkbookExport {
+  version: number
+  source: string
+}
+
+export function readSharedSource(): string | null {
   const hash = window.location.hash.slice(1)
   if (!hash.startsWith(HASH_KEY)) return null
 
@@ -16,14 +21,15 @@ export function readSharedSource() {
   }
 }
 
-export function shareUrl(source) {
+export function shareUrl(source: string): string {
   const url = new URL(window.location.href)
   url.hash = HASH_KEY + compressToEncodedURIComponent(source)
   return url.toString()
 }
 
-export function exportWorkbook(source) {
-  const file = new Blob([JSON.stringify({ version: WORKBOOK_VERSION, source }, null, 2)], { type: 'application/json' })
+export function exportWorkbook(source: string): void {
+  const workbook: WorkbookExport = { version: WORKBOOK_VERSION, source }
+  const file = new Blob([JSON.stringify(workbook, null, 2)], { type: 'application/json' })
   const url = URL.createObjectURL(file)
   const anchor = document.createElement('a')
   anchor.href = url
@@ -32,8 +38,8 @@ export function exportWorkbook(source) {
   URL.revokeObjectURL(url)
 }
 
-export function sourceFromWorkbookJson(json) {
-  let workbook
+export function sourceFromWorkbookJson(json: string): string {
+  let workbook: unknown
 
   try {
     workbook = JSON.parse(json)
@@ -45,13 +51,14 @@ export function sourceFromWorkbookJson(json) {
     throw new Error('Choose a valid Num workbook JSON file.')
   }
 
-  if (workbook.version !== WORKBOOK_VERSION) {
+  const exportedWorkbook = workbook as Partial<WorkbookExport>
+  if (exportedWorkbook.version !== WORKBOOK_VERSION) {
     throw new Error('This workbook uses an unsupported version.')
   }
 
-  if (typeof workbook.source !== 'string') {
+  if (typeof exportedWorkbook.source !== 'string') {
     throw new Error('This workbook has no calculator source.')
   }
 
-  return workbook.source
+  return exportedWorkbook.source
 }
