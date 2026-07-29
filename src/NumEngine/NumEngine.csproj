@@ -26,6 +26,7 @@
     <PackageReference Include="Microsoft.NET.Runtime.WebAssembly.Sdk" Version="10.0.10" />
     <PackageDownload Include="Microsoft.NET.Sdk.WebAssembly.Pack" Version="[10.0.10]" />
     <PackageDownload Include="Microsoft.NET.Runtime.MonoTargets.Sdk" Version="[10.0.10]" />
+    <PackageDownload Include="Microsoft.NETCore.App.Runtime.Mono.browser-wasm" Version="[10.0.10]" />
   </ItemGroup>
   <Import Project="$(WasmSdkPath)WasmApp.Common.targets" />
   <UsingTask TaskName="Microsoft.WebAssembly.Build.Tasks.WasmAppBuilder" AssemblyFile="$(WasmAppBuilderTasksAssemblyPath)" />

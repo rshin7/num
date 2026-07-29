@@ -1,0 +1,13 @@
+[build]
+  command = "bash scripts/netlify-build.sh"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# The WASM runtime uses stable filenames, so revalidate it after each deploy.
+[[headers]]
+  for = "/wasm/_framework/*.wasm"
+  [headers.values]
+    Content-Type = "application/wasm"
+    Cache-Control = "public, max-age=0, must-revalidate"

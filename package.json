@@ -7,7 +7,7 @@
   "type": "module",
   "scripts": {
     "dev": "npm run build:engine && vite",
-    "build:engine": "MSBuildEnableWorkloadResolver=false DOTNET_CLI_HOME=/private/tmp/num-dotnet-home dotnet build src/NumEngine/NumEngine.csproj -c Debug -p:UseSharedCompilation=false",
+    "build:engine": "MSBuildEnableWorkloadResolver=false DOTNET_CLI_HOME=$PWD/.dotnet-home dotnet build src/NumEngine/NumEngine.csproj -c Debug -p:UseSharedCompilation=false",
     "build": "npm run build:engine && vite build",
     "preview": "vite preview",
     "test": "npm run build:engine && node --test test/engine.test.mjs test/share.test.mjs"

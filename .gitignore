@@ -1,6 +1,8 @@
 node_modules/
 dist/
 public/wasm/
+.dotnet/
+**/.dotnet-home/
 **/bin/
 **/obj/
 .DS_Store
