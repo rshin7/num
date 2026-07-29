@@ -30,7 +30,26 @@ function App() {
   const [source, setSource] = useState(initialSource)
   const [workbook, setWorkbook] = useState({ results: [], total: '0' })
   const [shareState, setShareState] = useState('')
+  const appShellRef = useRef(null)
   const overlayRef = useRef(null)
+  const resultsRef = useRef(null)
+
+  useEffect(() => {
+    const viewport = window.visualViewport
+    if (!viewport) return undefined
+
+    const updateViewportHeight = () => {
+      appShellRef.current?.style.setProperty('--visual-viewport-height', `${Math.round(viewport.height)}px`)
+    }
+
+    updateViewportHeight()
+    viewport.addEventListener('resize', updateViewportHeight)
+    viewport.addEventListener('scroll', updateViewportHeight)
+    return () => {
+      viewport.removeEventListener('resize', updateViewportHeight)
+      viewport.removeEventListener('scroll', updateViewportHeight)
+    }
+  }, [])
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, source)
@@ -48,9 +67,13 @@ function App() {
   const lines = useMemo(() => source.split('\n'), [source])
 
   function syncScroll(event) {
+    const { scrollLeft, scrollTop } = event.currentTarget
     if (overlayRef.current) {
-      overlayRef.current.scrollTop = event.currentTarget.scrollTop
-      overlayRef.current.scrollLeft = event.currentTarget.scrollLeft
+      overlayRef.current.scrollTop = scrollTop
+      overlayRef.current.scrollLeft = scrollLeft
+    }
+    if (resultsRef.current) {
+      resultsRef.current.scrollTop = scrollTop
     }
   }
 
@@ -66,7 +89,7 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
+    <main className="app-shell" ref={appShellRef}>
       <nav className="actions" aria-label="Workbook actions">
         <button className="button icon" onClick={() => exportWorkbook(source)} aria-label="Download workbook">↓</button>
         <button className="button share" onClick={copyShareLink}>{shareState ? 'Copied' : 'Share'}</button>
@@ -92,7 +115,7 @@ function App() {
           </section>
 
           <aside className="result-section">
-            <output className="results" aria-live="polite">
+            <output className="results" ref={resultsRef} aria-live="polite">
               {lines.map((_, index) => {
                 const result = workbook.results[index]
                 return <div className={result?.isError ? 'error' : ''} key={index}>{result?.display || '\u00a0'}</div>
