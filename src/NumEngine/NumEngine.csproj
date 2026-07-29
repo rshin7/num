@@ -1,0 +1,80 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <WasmMainJSPath>main.js</WasmMainJSPath>
+    <WasmEmitAppBundle>true</WasmEmitAppBundle>
+    <WasmAppDir>$(MSBuildProjectDirectory)/../../public/wasm/</WasmAppDir>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <WasmSdkPath>$(NuGetPackageRoot)microsoft.net.runtime.webassembly.sdk/10.0.10/Sdk/</WasmSdkPath>
+    <WasmCommonTargetsPath>$(WasmSdkPath)</WasmCommonTargetsPath>
+    <MonoTargetsTasksAssemblyPath>$(NuGetPackageRoot)microsoft.net.runtime.monotargets.sdk/10.0.10/tasks/net10.0/MonoTargetsTasks.dll</MonoTargetsTasksAssemblyPath>
+    <WasmAppBuilderTasksAssemblyPath>$(NuGetPackageRoot)microsoft.net.runtime.webassembly.sdk/10.0.10/tasks/net10.0/WasmAppBuilder.dll</WasmAppBuilderTasksAssemblyPath>
+    <WasmRuntimePackPath>$(NuGetPackageRoot)microsoft.netcore.app.runtime.mono.browser-wasm/10.0.10/runtimes/browser-wasm/</WasmRuntimePackPath>
+    <MicrosoftNetCoreAppRuntimePackDir>$(NuGetPackageRoot)microsoft.netcore.app.runtime.mono.browser-wasm/10.0.10/</MicrosoftNetCoreAppRuntimePackDir>
+    <MicrosoftNetCoreAppRuntimePackRidDir>$(WasmRuntimePackPath)</MicrosoftNetCoreAppRuntimePackRidDir>
+    <MicrosoftNetCoreAppRuntimePackRidNativeDir>$(WasmRuntimePackPath)native/</MicrosoftNetCoreAppRuntimePackRidNativeDir>
+    <DisableAutoWasmBuildApp>true</DisableAutoWasmBuildApp>
+    <WasmEnableWebcil>false</WasmEnableWebcil>
+  </PropertyGroup>
+  <Import Project="$(WasmSdkPath)Sdk.props" />
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Runtime.WebAssembly.Sdk" Version="10.0.10" />
+    <PackageDownload Include="Microsoft.NET.Sdk.WebAssembly.Pack" Version="[10.0.10]" />
+    <PackageDownload Include="Microsoft.NET.Runtime.MonoTargets.Sdk" Version="[10.0.10]" />
+  </ItemGroup>
+  <Import Project="$(WasmSdkPath)WasmApp.Common.targets" />
+  <UsingTask TaskName="Microsoft.WebAssembly.Build.Tasks.WasmAppBuilder" AssemblyFile="$(WasmAppBuilderTasksAssemblyPath)" />
+  <ItemGroup>
+    <WasmNativeAsset Include="$(WasmRuntimePackPath)native/dotnet.js" />
+    <WasmNativeAsset Include="$(WasmRuntimePackPath)native/dotnet.runtime.js" />
+    <WasmNativeAsset Include="$(WasmRuntimePackPath)native/dotnet.native.wasm" />
+    <WasmNativeAsset Include="$(WasmRuntimePackPath)native/dotnet.native.js" />
+  </ItemGroup>
+  <Target Name="AddCalculatorAssembliesToWasmBundle" BeforeTargets="PrepareInputsForWasmBuild">
+    <ItemGroup>
+      <WasmAssembliesToBundle Include="$(TargetPath)" />
+      <WasmAssembliesToBundle Include="$(WasmRuntimePackPath)native/System.Private.CoreLib.dll" />
+      <WasmAssembliesToBundle Include="$(WasmRuntimePackPath)lib/net10.0/*.dll" />
+    </ItemGroup>
+  </Target>
+  <Target Name="GenerateCalculatorAppBundle" AfterTargets="Build" DependsOnTargets="_InitializeCommonProperties;PrepareInputsForWasmBuild">
+    <ItemGroup>
+      <WasmExtraFilesToDeploy Include="$(WasmMainJSPath)" />
+    </ItemGroup>
+    <RemoveDir Directories="$(WasmAppDir)" />
+    <WasmAppBuilder
+      AppDir="$(WasmAppDir)"
+      ConfigFileName="dotnet.boot.js"
+      Assemblies="@(_WasmAssembliesInternal)"
+      MainAssemblyName="$(WasmMainAssemblyFileName)"
+      HostConfigs="@(HostConfig)"
+      RuntimeArgsForHost="@(WasmMonoRuntimeArgs)"
+      DefaultHostConfig="$(DefaultWasmHostConfig)"
+      InvariantGlobalization="$(InvariantGlobalization)"
+      SatelliteAssemblies="@(_WasmSatelliteAssemblies)"
+      FilesToIncludeInFileSystem="@(WasmFilesToIncludeInFileSystem)"
+      IcuDataFileNames="@(WasmIcuDataFileNames)"
+      RemoteSources="@(WasmRemoteSources)"
+      NativeAssets="@(WasmNativeAsset)"
+      ExtraFilesToDeploy="@(WasmExtraFilesToDeploy)"
+      ExtraConfig="@(WasmExtraConfig)"
+      EnvVariables="@(WasmEnvironmentVariable)"
+      Profilers="$(WasmProfilers)"
+      DebugLevel="0"
+      IsPublish="false"
+      IncludeThreadsWorker="false"
+      PThreadPoolInitialSize="-1"
+      PThreadPoolUnusedSize="-1"
+      RuntimeAssetsLocation="_framework"
+      RuntimeConfigJsonPath="$(ProjectRuntimeConfigFilePath)"
+      UseWebcil="false"
+      IsAot="false"
+      IsMultiThreaded="false" />
+    <WriteLinesToFile File="$(WasmAppDir).stamp" Lines="" Overwrite="true" />
+  </Target>
+</Project>

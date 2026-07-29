@@ -1,0 +1,24 @@
+{
+  "name": "num",
+  "private": true,
+  "version": "0.1.0",
+  "author": "Richard Shin",
+  "license": "Apache-2.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build:engine && vite",
+    "build:engine": "MSBuildEnableWorkloadResolver=false DOTNET_CLI_HOME=/private/tmp/num-dotnet-home dotnet build src/NumEngine/NumEngine.csproj -c Debug -p:UseSharedCompilation=false",
+    "build": "npm run build:engine && vite build",
+    "preview": "vite preview",
+    "test": "npm run build:engine && node --test test/engine.test.mjs test/share.test.mjs"
+  },
+  "dependencies": {
+    "lz-string": "^1.5.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.2",
+    "vite": "^7.1.7"
+  }
+}

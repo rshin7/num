@@ -1,0 +1,123 @@
+:root {
+  color: #eef0f7;
+  background: #0e1018;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+}
+
+* { box-sizing: border-box; }
+body { min-width: 320px; min-height: 100vh; margin: 0; }
+button, textarea { font: inherit; }
+button { cursor: pointer; }
+
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 38px;
+  background: radial-gradient(circle at 50% -10%, #2a31521c, transparent 42rem), #0e1018;
+}
+
+.actions { position: fixed; z-index: 2; top: 22px; right: 26px; display: flex; gap: 7px; }
+.button {
+  min-width: 38px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #ffffff13;
+  border-radius: 9px;
+  color: #c7cada;
+  background: #ffffff08;
+  font-size: 12px;
+  font-weight: 650;
+  transition: background .14s ease, color .14s ease;
+}
+.button:hover { color: #ffffff; background: #ffffff13; }
+.button.icon { padding: 0; color: #9298ac; font-size: 18px; font-weight: 400; }
+.button.share { color: #baf0cf; border-color: #baf0cf18; }
+
+.workspace {
+  width: min(1100px, 100%);
+  height: min(78vh, 780px);
+  min-height: 500px;
+  overflow: hidden;
+  border: 1px solid #ffffff12;
+  border-radius: 16px;
+  background: #171a25;
+  box-shadow: 0 24px 70px #00000036;
+}
+
+.calculator-grid { height: 100%; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(190px, 23%); }
+.editor-section { min-width: 0; min-height: 0; border-right: 1px solid #ffffff0b; }
+.result-section { min-height: 0; background: #11141e; }
+.editor-panel { position: relative; height: 100%; overflow: hidden; }
+.editor-panel textarea, .highlighter, .results {
+  margin: 0;
+  font-family: "SF Mono", "Cascadia Code", "Roboto Mono", ui-monospace, monospace;
+  font-size: clamp(16px, 1.8vw, 21px);
+  font-weight: 520;
+  line-height: 1.9;
+  letter-spacing: -.035em;
+  tab-size: 2;
+}
+.highlighter, .editor-panel textarea { padding: 30px 34px; border: 0; white-space: pre; overflow: auto; }
+.highlighter { position: absolute; inset: 0; pointer-events: none; color: #e9ebf1; scrollbar-width: none; }
+.highlighter::-webkit-scrollbar { display: none; }
+.expression { color: #e9ebf1; }
+.comment { color: #c9a76a; }
+.editor-panel textarea {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  resize: none;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  caret-color: #fff;
+}
+.editor-panel textarea::placeholder { color: #5f6576; -webkit-text-fill-color: #5f6576; opacity: 1; }
+.editor-panel textarea::selection { background: #6686c477; }
+
+.results { display: block; width: 100%; height: 100%; min-width: 0; padding: 30px 34px 30px 20px; overflow: hidden; color: #8cdfa8; text-align: right; white-space: pre; }
+.results div { height: 1.9em; overflow: hidden; text-overflow: ellipsis; }
+.results .error { color: #fa8a87; font-size: .72em; letter-spacing: -.06em; }
+
+.floating-total {
+  position: fixed;
+  z-index: 3;
+  bottom: 22px;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 158px;
+  padding: 10px 15px 11px;
+  border: 1px solid #ffffff17;
+  border-radius: 12px;
+  background: #202431e8;
+  box-shadow: 0 10px 28px #00000047;
+  backdrop-filter: blur(14px);
+  transform: translateX(-50%);
+}
+.floating-total span { color: #989dad; font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+.floating-total b { margin-left: auto; color: #f1f5f3; font-family: "SF Mono", "Cascadia Code", ui-monospace, monospace; font-size: 19px; letter-spacing: -.06em; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; clip-path: inset(50%); }
+
+@media (max-width: 700px) {
+  .app-shell { min-height: 100dvh; padding: 10px; }
+  .actions { top: 16px; right: 16px; }
+  .workspace { width: 100%; height: calc(100dvh - 20px); min-height: 0; border-radius: 12px; }
+  .calculator-grid { grid-template-columns: minmax(0, 1fr) 116px; }
+  .editor-panel textarea, .highlighter, .results { font-size: 14px; line-height: 1.95; }
+  .highlighter, .editor-panel textarea { padding: 23px 17px; }
+  .results { padding: 23px 17px 23px 10px; }
+  .results div { height: 1.95em; }
+  .floating-total { bottom: 14px; min-width: 138px; padding: 9px 12px 10px; }
+  .floating-total b { font-size: 16px; }
+}
+
+@media (max-width: 390px) {
+  .calculator-grid { grid-template-columns: minmax(0, 1fr) 100px; }
+  .button.icon { display: none; }
+}
