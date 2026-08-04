@@ -20,12 +20,18 @@ button { cursor: pointer; }
   background: radial-gradient(circle at 50% -10%, #2a31521c, transparent 42rem), #0e1018;
 }
 
-.actions { position: fixed; z-index: 2; top: 22px; right: 26px; display: flex; gap: 7px; }
-.account-status {
+.topbar {
   position: fixed;
   z-index: 2;
-  top: 31px;
+  top: 22px;
+  right: 26px;
   left: 27px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.actions { display: flex; flex: none; gap: 7px; margin-left: auto; }
+.account-status {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -156,17 +162,29 @@ button { cursor: pointer; }
     gap: 10px;
     overflow: hidden;
   }
-  .actions { position: static; justify-content: flex-end; }
+  .topbar { position: static; min-width: 0; gap: 7px; }
+  .actions { gap: 5px; }
   .account-status {
-    top: max(20px, calc(env(safe-area-inset-top) + 10px));
-    left: max(11px, calc(env(safe-area-inset-left) + 10px));
-    max-width: calc(100vw - 258px);
-    gap: 6px;
+    flex: 1 1 0;
+    min-width: 0;
+    gap: 5px;
     font-size: 12px;
   }
-  .cloud-activity { font-size: 11px; }
-  .workspace { width: 100%; height: auto; min-height: 0; border-radius: 12px; }
-  .calculator-grid { grid-template-columns: minmax(0, 1fr) 102px; }
+  .account-name { flex: 1 1 auto; min-width: 0; }
+  .cloud-activity { flex: none; font-size: 11px; }
+  .save-button { flex: none; }
+  .workspace {
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-radius: 12px;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+  .calculator-grid { width: 440px; min-width: 100%; grid-template-columns: minmax(320px, 1fr) 120px; }
   .editor-panel textarea, .highlighter { font-size: 16px; line-height: 1.8; }
   .highlighter, .editor-panel textarea { padding: 17px 14px 24px 16px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
   .results {
@@ -189,5 +207,8 @@ button { cursor: pointer; }
 }
 
 @media (max-width: 390px) {
-  .calculator-grid { grid-template-columns: minmax(0, 1fr) 94px; }
+  .topbar { gap: 4px; }
+  .actions { gap: 4px; }
+  .button.share { padding: 0 8px; }
+  .cloud-activity { font-size: 10px; }
 }

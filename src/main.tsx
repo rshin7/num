@@ -408,27 +408,29 @@ function App() {
 
   return (
     <main className="app-shell" ref={appShellRef}>
-      {(githubIdentity || cloudActivity) && (
-        <div className={`account-status${cloudState === 'error' ? ' error' : ''}`} aria-live="polite">
-          {githubIdentity && <span className="account-name">Hello {githubIdentity.name}</span>}
-          {githubIdentity && cloudWorkspace && canSyncCloud && (
-            <button className="save-button" onClick={() => { void saveCloudWorkspace() }} disabled={cloudState === 'saving'}>Save</button>
-          )}
-          {cloudActivity && <span className="cloud-activity">{cloudState === 'saving' && <i aria-hidden="true" />}{cloudActivity}</span>}
-        </div>
-      )}
-      <nav className="actions" aria-label="Workbook actions">
-        <input className="visually-hidden" ref={fileInputRef} type="file" accept="application/json,.json" onChange={importWorkbook} />
-        <button
-          className={`button icon import${importState ? ` ${importState}` : ''}`}
-          onClick={openImportPicker}
-          aria-label={importState === 'error' ? 'Import failed. Try another workbook.' : 'Import workbook'}
-          title="Import workbook"
-        >{importState === 'done' ? '✓' : importState === 'error' ? '!' : '↑'}</button>
-        <button className="button icon" onClick={() => exportWorkbook(source)} aria-label="Download workbook">↓</button>
-        {!githubIdentity && <button className="button github" onClick={connectGitHub}>GitHub</button>}
-        <button className="button share" onClick={copyShareLink}>{shareState === 'Link copied' ? 'Copied' : 'Copy link'}</button>
-      </nav>
+      <header className="topbar">
+        {(githubIdentity || cloudActivity) && (
+          <div className={`account-status${cloudState === 'error' ? ' error' : ''}`} aria-live="polite">
+            {githubIdentity && <span className="account-name">Hello {githubIdentity.name}</span>}
+            {githubIdentity && cloudWorkspace && canSyncCloud && (
+              <button className="save-button" onClick={() => { void saveCloudWorkspace() }} disabled={cloudState === 'saving'}>Save</button>
+            )}
+            {cloudActivity && <span className="cloud-activity">{cloudState === 'saving' && <i aria-hidden="true" />}{cloudActivity}</span>}
+          </div>
+        )}
+        <nav className="actions" aria-label="Workbook actions">
+          <input className="visually-hidden" ref={fileInputRef} type="file" accept="application/json,.json" onChange={importWorkbook} />
+          <button
+            className={`button icon import${importState ? ` ${importState}` : ''}`}
+            onClick={openImportPicker}
+            aria-label={importState === 'error' ? 'Import failed. Try another workbook.' : 'Import workbook'}
+            title="Import workbook"
+          >{importState === 'done' ? '✓' : importState === 'error' ? '!' : '↑'}</button>
+          <button className="button icon" onClick={() => exportWorkbook(source)} aria-label="Download workbook">↓</button>
+          {!githubIdentity && <button className="button github" onClick={connectGitHub}>GitHub</button>}
+          <button className="button share" onClick={copyShareLink}>{shareState === 'Link copied' ? 'Copied' : 'Copy link'}</button>
+        </nav>
+      </header>
 
       <section className="workspace" aria-label="Calculator workbook">
         <div className="calculator-grid">
