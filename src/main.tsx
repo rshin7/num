@@ -5,11 +5,12 @@ import { evaluateWorkbook, type WorkbookEvaluation } from './engine'
 import { exportWorkbook, readSharedSource, replaceUrlForSource, sourceFromWorkbookJson } from './share'
 import './styles.css'
 
-const STORAGE_KEY = 'num:workbook:v2'
+const LOCAL_STORAGE_KEY = 'num:workbook:v2'
 const CLOUD_WORKSPACE_STORAGE_KEY = 'num:github:workspace:v1'
+const CLOUD_SOURCE_STORAGE_PREFIX = 'num:github:workbook:v1:'
 const MAX_IMPORT_BYTES = 1_000_000
 const URL_SYNC_DELAY = 300
-const CLOUD_SYNC_DELAY = 700
+const CLOUD_SYNC_DELAY = 2_500
 
 interface GitHubIdentity {
   login: string
@@ -18,7 +19,11 @@ interface GitHubIdentity {
 
 function initialSource(): string {
   if (readWorkspaceFromLocation()) return ''
-  return readSharedSource() ?? localStorage.getItem(STORAGE_KEY) ?? ''
+  const sharedSource = readSharedSource()
+  if (sharedSource !== null) return sharedSource
+  const workspace = readStoredWorkspace()
+  if (workspace) return localStorage.getItem(cloudSourceStorageKey(workspace)) ?? ''
+  return localStorage.getItem(LOCAL_STORAGE_KEY) ?? ''
 }
 
 function readWorkspaceFromLocation(): CloudWorkspace | null {
@@ -45,6 +50,10 @@ function storeWorkspace(workspace: CloudWorkspace): void {
   localStorage.setItem(CLOUD_WORKSPACE_STORAGE_KEY, JSON.stringify(workspace))
 }
 
+function cloudSourceStorageKey(workspace: CloudWorkspace): string {
+  return `${CLOUD_SOURCE_STORAGE_PREFIX}${workspace.gistId}`
+}
+
 function highlight(source: string) {
   const lines = source.split('\n')
   return lines.map((line, index) => {
@@ -67,7 +76,7 @@ function App() {
   const [shareState, setShareState] = useState<string>('')
   const [importState, setImportState] = useState<'done' | 'error' | ''>('')
   const [linkedWorkspace] = useState<CloudWorkspace | null>(readWorkspaceFromLocation)
-  const [cloudWorkspace, setCloudWorkspace] = useState<CloudWorkspace | null>(() => linkedWorkspace ?? readStoredWorkspace())
+  const [cloudWorkspace, setCloudWorkspace] = useState<CloudWorkspace | null>(() => linkedWorkspace ?? (readSharedSource() === null ? readStoredWorkspace() : null))
   const [isLoadingLinkedWorkspace, setIsLoadingLinkedWorkspace] = useState<boolean>(() => Boolean(linkedWorkspace))
   const [cloudState, setCloudState] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'unsaved' | 'error'>(() => linkedWorkspace ? 'loading' : 'idle')
   const [canSyncCloud, setCanSyncCloud] = useState(false)
@@ -142,7 +151,7 @@ function App() {
   useEffect(() => {
     setShareState('')
     if (isLoadingLinkedWorkspace) return
-    localStorage.setItem(STORAGE_KEY, source)
+    localStorage.setItem(cloudWorkspace ? cloudSourceStorageKey(cloudWorkspace) : LOCAL_STORAGE_KEY, source)
     let disposed = false
     evaluateWorkbook(source)
       .then((next) => {
@@ -150,7 +159,7 @@ function App() {
       })
       .catch(() => {})
     return () => { disposed = true }
-  }, [source, isLoadingLinkedWorkspace])
+  }, [cloudWorkspace, source, isLoadingLinkedWorkspace])
 
   useEffect(() => {
     if (!linkedWorkspace) return undefined
@@ -206,7 +215,10 @@ function App() {
 
   useEffect(() => {
     if (!githubIdentity || !cloudWorkspace) return
-    if (!linkedWorkspace || gistOwnerLogin === githubIdentity.login) setCanSyncCloud(true)
+    if (!linkedWorkspace || gistOwnerLogin === githubIdentity.login) {
+      storeWorkspace(cloudWorkspace)
+      setCanSyncCloud(true)
+    }
   }, [cloudWorkspace, gistOwnerLogin, githubIdentity, linkedWorkspace])
 
   useEffect(() => {
@@ -357,7 +369,7 @@ function App() {
       : ''
 
   function connectGitHub(): void {
-    localStorage.setItem(STORAGE_KEY, source)
+    localStorage.setItem(cloudWorkspace ? cloudSourceStorageKey(cloudWorkspace) : LOCAL_STORAGE_KEY, source)
     const authorizationUrl = new URL('/.netlify/functions/github-auth-start', window.location.origin)
     authorizationUrl.searchParams.set('returnTo', `${window.location.pathname}${window.location.search}`)
     window.location.assign(authorizationUrl)
