@@ -5,6 +5,11 @@
 [build.environment]
   NODE_VERSION = "22"
 
+[[redirects]]
+  from = "/gist/*"
+  to = "/index.html"
+  status = 200
+
 # The WASM runtime uses stable filenames, so revalidate it after each deploy.
 [[headers]]
   for = "/wasm/_framework/*.wasm"

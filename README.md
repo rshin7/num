@@ -10,6 +10,7 @@ It is an independent open-source project, released under the Apache License 2.0.
 - Variables, parentheses, percentages, `abs`, `round`, `min`, and `max`.
 - Currency-aware `$`, `€`, `£`, and `¥` arithmetic.
 - Notes with `#`, local browser persistence, compressed URL sharing, and JSON import/export.
+- Optional encrypted GitHub Gist sync with a compact link key.
 - A responsive editor/results layout for desktop and mobile screens.
 
 ## Requirements
@@ -35,7 +36,7 @@ use `npm run build` as the build command with `dist` as the publish directory.
 The build script installs .NET 10 when the Netlify image does not already have
 it; Netlify then serves the generated static site.
 
-### Optional GitHub Gist sync
+### Optional encrypted GitHub Gist sync
 
 The `netlify/functions/` directory contains a stateless GitHub App OAuth flow
 and an authenticated Gist proxy. It stores the user's GitHub token only in an
@@ -51,8 +52,16 @@ https://YOUR-SITE.netlify.app/.netlify/functions/github-auth-callback
 Leave GitHub App webhooks inactive: this integration does not receive GitHub
 events. Add the variables listed in `.env.example` through the Netlify UI, not
 in `netlify.toml` or the repository. Use a unique `NUM_SESSION_SECRET` of at
-least 32 characters. The Gist endpoint accepts encrypted workbook content; the
-browser encryption and sync UI can be added once the GitHub App is registered.
+least 32 characters.
+
+After configuration, use **GitHub** in the top-right corner. The first sign-in
+creates one secret Gist for the current workbook; subsequent edits update that
+same Gist. Before upload, the browser encrypts the workbook with AES-GCM. Its
+share link is shaped like `/gist/<id>#<key>`: the short ID finds the Gist, and
+the fragment key decrypts it. The key never reaches Netlify, GitHub, or server
+logs. Keep the complete link: anyone with it can read the workbook, and a lost
+key cannot be recovered. A person opening a link can read it without signing
+in; they do not automatically get permission to overwrite the owner's Gist.
 
 ## Commands
 
@@ -77,7 +86,7 @@ Assignments set variables but do not add to the running total. Ordinary expressi
 
 ## Data and sharing
 
-The active workbook is stored in the browser's `localStorage`; Num has no account system or database. The workbook is compressed into the URL fragment after a brief pause in typing, so the address bar is always ready to share without adding browser-history entries. The fragment is self-contained and is not sent to a web server. Use **Copy link** to copy it, **↓** to export JSON, and **↑** to import a previously exported workbook. Imports are validated before replacing the active workbook.
+The active workbook is stored in the browser's `localStorage`; Num has no database. Without GitHub sync, the workbook is compressed into the URL fragment after a brief pause in typing, so the address bar is always ready to share without adding browser-history entries. The fragment is self-contained and is not sent to a web server. With GitHub sync, the link contains only the encrypted-Gist locator and decryption key. Use **Copy link** to copy it, **↓** to export JSON, and **↑** to import a previously exported workbook. Imports are validated before replacing the active workbook.
 
 ## Project structure
 

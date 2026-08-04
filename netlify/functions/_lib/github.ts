@@ -143,8 +143,20 @@ export async function authenticatedSession(request: Request): Promise<{ session:
 
 export async function githubRequest(session: GitHubSession, path: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers)
-  headers.set('Accept', 'application/vnd.github+json')
   headers.set('Authorization', `Bearer ${session.accessToken}`)
+  return githubApiRequest(path, {
+    ...init,
+    headers,
+  })
+}
+
+export async function publicGitHubRequest(path: string, init: RequestInit = {}): Promise<Response> {
+  return githubApiRequest(path, init)
+}
+
+async function githubApiRequest(path: string, init: RequestInit): Promise<Response> {
+  const headers = new Headers(init.headers)
+  headers.set('Accept', 'application/vnd.github+json')
   headers.set('X-GitHub-Api-Version', '2022-11-28')
   headers.set('User-Agent', 'num-workbook')
   return fetch(new URL(path, GITHUB_API_URL), { ...init, headers })

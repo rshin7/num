@@ -1,4 +1,4 @@
-import { AuthenticationError, authenticatedSession, clearSessionCookie, errorResponse, githubRequest, sameOrigin } from './_lib/github'
+import { AuthenticationError, authenticatedSession, clearSessionCookie, errorResponse, githubRequest, publicGitHubRequest, sameOrigin } from './_lib/github'
 import type { Context } from '@netlify/functions'
 
 const MAX_GIST_CONTENT_BYTES = 900_000
@@ -13,16 +13,15 @@ export default async function githubGists(request: Request, _context: Context): 
   if (!sameOrigin(request)) return errorResponse('Cross-origin requests are not allowed.', 403)
 
   try {
-    const { session, refreshedCookie } = await authenticatedSession(request)
     const url = new URL(request.url)
+    if (request.method === 'GET') {
+      return githubResponse(await publicGitHubRequest(`/gists/${requiredGistId(url)}`))
+    }
+
+    const { session, refreshedCookie } = await authenticatedSession(request)
     let response: Response
 
     switch (request.method) {
-      case 'GET': {
-        const gistId = requiredGistId(url)
-        response = await githubRequest(session, `/gists/${gistId}`)
-        break
-      }
       case 'POST': {
         const workbook = await readWorkbook(request)
         response = await githubRequest(session, '/gists', {

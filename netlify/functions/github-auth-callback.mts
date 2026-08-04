@@ -13,7 +13,9 @@ export default async function githubAuthCallback(request: Request, _context: Con
 
   try {
     const { session, returnTo } = await completeGitHubAuthorization(request, code, state)
-    const headers = new Headers({ Location: returnTo, 'Cache-Control': 'no-store' })
+    const destination = new URL(returnTo)
+    destination.searchParams.set('github', 'connected')
+    const headers = new Headers({ Location: destination.toString(), 'Cache-Control': 'no-store' })
     headers.append('Set-Cookie', sessionCookie(request, session))
     headers.append('Set-Cookie', clearOAuthCookie(request))
     return new Response(null, { status: 302, headers })
