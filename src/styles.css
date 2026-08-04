@@ -7,6 +7,7 @@
 
 * { box-sizing: border-box; }
 html, body, #root { min-height: 100%; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { min-width: 320px; min-height: 100vh; margin: 0; }
 button, textarea { font: inherit; }
 button { cursor: pointer; }
@@ -155,7 +156,14 @@ button { cursor: pointer; }
   .calculator-grid { grid-template-columns: minmax(0, 1fr) 102px; }
   .editor-panel textarea, .highlighter { font-size: 16px; line-height: 1.8; }
   .highlighter, .editor-panel textarea { padding: 17px 14px 24px 16px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
-  .results { padding: 17px 11px 24px 7px; font-size: 14px; line-height: 28.8px; pointer-events: none; }
+  .results {
+    padding: 17px 11px 24px 7px;
+    font-size: 14px;
+    line-height: 28.8px;
+    overscroll-behavior: contain;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
   .results div { height: 28.8px; }
   .floating-total {
     position: static;

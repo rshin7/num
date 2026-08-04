@@ -82,12 +82,28 @@ function App() {
       appShellRef.current?.style.setProperty('--visual-viewport-height', `${Math.round(viewport.height)}px`)
     }
 
-    updateViewportHeight()
-    viewport.addEventListener('resize', updateViewportHeight)
-    viewport.addEventListener('scroll', updateViewportHeight)
+    const refreshViewportHeight = () => {
+      updateViewportHeight()
+      window.requestAnimationFrame(updateViewportHeight)
+      window.setTimeout(updateViewportHeight, 180)
+    }
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshViewportHeight()
+    }
+
+    refreshViewportHeight()
+    viewport.addEventListener('resize', refreshViewportHeight)
+    viewport.addEventListener('scroll', refreshViewportHeight)
+    window.addEventListener('pageshow', refreshViewportHeight)
+    window.addEventListener('orientationchange', refreshViewportHeight)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
     return () => {
-      viewport.removeEventListener('resize', updateViewportHeight)
-      viewport.removeEventListener('scroll', updateViewportHeight)
+      viewport.removeEventListener('resize', refreshViewportHeight)
+      viewport.removeEventListener('scroll', refreshViewportHeight)
+      window.removeEventListener('pageshow', refreshViewportHeight)
+      window.removeEventListener('orientationchange', refreshViewportHeight)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
   }, [])
 
@@ -254,13 +270,19 @@ function App() {
 
   const lines = useMemo<string[]>(() => source.split('\n'), [source])
 
-  function syncScroll(event: UIEvent<HTMLTextAreaElement>): void {
+  function syncEditorScroll(event: UIEvent<HTMLTextAreaElement>): void {
     const { scrollLeft, scrollTop } = event.currentTarget
     if (overlayRef.current) {
       overlayRef.current.scrollTop = scrollTop
       overlayRef.current.scrollLeft = scrollLeft
     }
     if (resultsRef.current) resultsRef.current.scrollTop = scrollTop
+  }
+
+  function syncResultsScroll(event: UIEvent<HTMLOutputElement>): void {
+    const { scrollTop } = event.currentTarget
+    if (editorRef.current) editorRef.current.scrollTop = scrollTop
+    if (overlayRef.current) overlayRef.current.scrollTop = scrollTop
   }
 
   async function copyShareLink(): Promise<void> {
@@ -350,7 +372,7 @@ function App() {
                 value={source}
                 placeholder={'Start writing…\n\n25 * 4  # groceries'}
                 onChange={(event) => setSource(event.target.value)}
-                onScroll={syncScroll}
+                onScroll={syncEditorScroll}
                 spellCheck="false"
                 autoCapitalize="off"
                 autoComplete="off"
@@ -360,7 +382,7 @@ function App() {
           </section>
 
           <aside className="result-section">
-            <output className="results" ref={resultsRef} aria-live="polite">
+            <output className="results" ref={resultsRef} onScroll={syncResultsScroll} aria-live="polite">
               {lines.map((_, index) => {
                 const result = workbook.results[index]
                 return <div className={result?.isError ? 'error' : ''} key={index}>{result?.display || '\u00a0'}</div>
