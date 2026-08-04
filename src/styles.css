@@ -20,6 +20,24 @@ button { cursor: pointer; }
 }
 
 .actions { position: fixed; z-index: 2; top: 22px; right: 26px; display: flex; gap: 7px; }
+.account-status {
+  position: fixed;
+  z-index: 2;
+  top: 31px;
+  left: 27px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  color: #c7cada;
+  font-size: 13px;
+  font-weight: 600;
+}
+.account-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-activity { display: inline-flex; align-items: center; gap: 6px; color: #989dad; white-space: nowrap; font-size: 12px; }
+.cloud-activity i { width: 11px; height: 11px; border: 1.5px solid #9298ac; border-right-color: transparent; border-radius: 50%; animation: cloud-spin .7s linear infinite; }
+.account-status.error .cloud-activity { color: #fa8a87; }
+@keyframes cloud-spin { to { transform: rotate(360deg); } }
 .button {
   min-width: 38px;
   height: 36px;
@@ -125,6 +143,14 @@ button { cursor: pointer; }
     overflow: hidden;
   }
   .actions { position: static; justify-content: flex-end; }
+  .account-status {
+    top: max(20px, calc(env(safe-area-inset-top) + 10px));
+    left: max(11px, calc(env(safe-area-inset-left) + 10px));
+    max-width: calc(100vw - 258px);
+    gap: 6px;
+    font-size: 12px;
+  }
+  .cloud-activity { font-size: 11px; }
   .workspace { width: 100%; height: auto; min-height: 0; border-radius: 12px; }
   .calculator-grid { grid-template-columns: minmax(0, 1fr) 102px; }
   .editor-panel textarea, .highlighter { font-size: 16px; line-height: 1.8; }

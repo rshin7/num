@@ -31,6 +31,13 @@ test('supports parentheses, percentages, and built-in functions', () => {
   assert.equal(workbook.total, '255.089')
 })
 
+test('negates parenthesized expressions before adding them to the total', () => {
+  const workbook = evaluate('-45.00 # US Bank Altitude 9/6\n-(43.22 + 1) # Savings test')
+
+  assert.deepEqual(workbook.results.map((result) => result.display), ['-45', '-44.22'])
+  assert.equal(workbook.total, '-89.22')
+})
+
 test('ignores comment-only rows and reports invalid arithmetic per row', () => {
   const workbook = evaluate('# planned expense\n$10 + €2\n20 / 0')
 
