@@ -51,7 +51,7 @@ Assignments set variables but do not add to the running total. Ordinary expressi
 
 ## Data and sharing
 
-The active workbook is stored in the browser's `localStorage`; Num has no account system or database. **Share** compresses the workbook into the URL fragment, so the fragment is self-contained and is not sent to a web server. The link therefore changes when its contents change. Use **↓** to export JSON and **↑** to import a previously exported workbook. Imports are validated before replacing the active workbook.
+The active workbook is stored in the browser's `localStorage`; Num has no account system or database. The workbook is compressed into the URL fragment after a brief pause in typing, so the address bar is always ready to share without adding browser-history entries. The fragment is self-contained and is not sent to a web server. Use **Copy link** to copy it, **↓** to export JSON, and **↑** to import a previously exported workbook. Imports are validated before replacing the active workbook.
 
 ## Project structure
 

@@ -23,8 +23,16 @@ export function readSharedSource(): string | null {
 
 export function shareUrl(source: string): string {
   const url = new URL(window.location.href)
-  url.hash = HASH_KEY + compressToEncodedURIComponent(source)
+  url.hash = source ? HASH_KEY + compressToEncodedURIComponent(source) : ''
   return url.toString()
+}
+
+export function replaceUrlForSource(source: string): string {
+  const url = shareUrl(source)
+  if (url !== window.location.href) {
+    window.history.replaceState(window.history.state, '', url)
+  }
+  return url
 }
 
 export function exportWorkbook(source: string): void {

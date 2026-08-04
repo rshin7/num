@@ -1,11 +1,12 @@
 import { type ChangeEvent, type UIEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { evaluateWorkbook, type WorkbookEvaluation } from './engine'
-import { exportWorkbook, readSharedSource, shareUrl, sourceFromWorkbookJson } from './share'
+import { exportWorkbook, readSharedSource, replaceUrlForSource, sourceFromWorkbookJson } from './share'
 import './styles.css'
 
 const STORAGE_KEY = 'num:workbook:v2'
 const MAX_IMPORT_BYTES = 1_000_000
+const URL_SYNC_DELAY = 300
 
 function initialSource(): string {
   return readSharedSource() ?? localStorage.getItem(STORAGE_KEY) ?? ''
@@ -59,6 +60,7 @@ function App() {
   useEffect(() => () => window.clearTimeout(importTimerRef.current), [])
 
   useEffect(() => {
+    setShareState('')
     localStorage.setItem(STORAGE_KEY, source)
     let disposed = false
     evaluateWorkbook(source)
@@ -67,6 +69,18 @@ function App() {
       })
       .catch(() => {})
     return () => { disposed = true }
+  }, [source])
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      try {
+        replaceUrlForSource(source)
+      } catch {
+        // Keep the workbook usable if the browser declines a history update.
+      }
+    }, URL_SYNC_DELAY)
+
+    return () => window.clearTimeout(timeout)
   }, [source])
 
   const lines = useMemo<string[]>(() => source.split('\n'), [source])
@@ -81,7 +95,7 @@ function App() {
   }
 
   async function copyShareLink(): Promise<void> {
-    const url = shareUrl(source)
+    const url = replaceUrlForSource(source)
     try {
       await navigator.clipboard.writeText(url)
       setShareState('Link copied')
@@ -133,7 +147,7 @@ function App() {
           title="Import workbook"
         >{importState === 'done' ? '✓' : importState === 'error' ? '!' : '↑'}</button>
         <button className="button icon" onClick={() => exportWorkbook(source)} aria-label="Download workbook">↓</button>
-        <button className="button share" onClick={copyShareLink}>{shareState === 'Link copied' ? 'Copied' : 'Share'}</button>
+        <button className="button share" onClick={copyShareLink}>{shareState === 'Link copied' ? 'Copied' : 'Copy link'}</button>
       </nav>
 
       <section className="workspace" aria-label="Calculator workbook">
