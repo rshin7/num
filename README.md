@@ -28,6 +28,32 @@ npm run dev
 
 Open the local address printed by Vite. The calculator begins with a blank workbook.
 
+## Deploy to Netlify
+
+This repository includes `netlify.toml`. Connect the repository in Netlify and
+use `npm run build` as the build command with `dist` as the publish directory.
+The build script installs .NET 10 when the Netlify image does not already have
+it; Netlify then serves the generated static site.
+
+### Optional GitHub Gist sync
+
+The `netlify/functions/` directory contains a stateless GitHub App OAuth flow
+and an authenticated Gist proxy. It stores the user's GitHub token only in an
+encrypted, HTTP-only cookie; it does not require a database.
+
+Create the GitHub App with only the account-level **Gists: Read and write**
+permission. Set its callback URL to:
+
+```text
+https://YOUR-SITE.netlify.app/.netlify/functions/github-auth-callback
+```
+
+Leave GitHub App webhooks inactive: this integration does not receive GitHub
+events. Add the variables listed in `.env.example` through the Netlify UI, not
+in `netlify.toml` or the repository. Use a unique `NUM_SESSION_SECRET` of at
+least 32 characters. The Gist endpoint accepts encrypted workbook content; the
+browser encryption and sync UI can be added once the GitHub App is registered.
+
 ## Commands
 
 | Command | Purpose |
