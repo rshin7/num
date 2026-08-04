@@ -19,7 +19,7 @@ export default async function githubUser(request: Request, _context: Context): P
     const login = typeof user.login === 'string' ? user.login.trim() : ''
     const name = typeof user.name === 'string' ? user.name.trim() : ''
     if (!login) return errorResponse('GitHub did not return an account name.', 502, refreshedCookie ? { 'Set-Cookie': refreshedCookie } : undefined)
-    return jsonResponse({ name: name || login }, 200, refreshedCookie ? { 'Set-Cookie': refreshedCookie } : undefined)
+    return jsonResponse({ login, name: name || login }, 200, refreshedCookie ? { 'Set-Cookie': refreshedCookie } : undefined)
   } catch (error) {
     if (error instanceof AuthenticationError) {
       return errorResponse(error.message, 401, { 'Set-Cookie': clearSessionCookie(request) })

@@ -11,6 +11,11 @@ const MAX_IMPORT_BYTES = 1_000_000
 const URL_SYNC_DELAY = 300
 const CLOUD_SYNC_DELAY = 700
 
+interface GitHubIdentity {
+  login: string
+  name: string
+}
+
 function initialSource(): string {
   if (readWorkspaceFromLocation()) return ''
   return readSharedSource() ?? localStorage.getItem(STORAGE_KEY) ?? ''
@@ -62,17 +67,20 @@ function App() {
   const [shareState, setShareState] = useState<string>('')
   const [importState, setImportState] = useState<'done' | 'error' | ''>('')
   const [linkedWorkspace] = useState<CloudWorkspace | null>(readWorkspaceFromLocation)
-  const [cloudWorkspace, setCloudWorkspace] = useState<CloudWorkspace | null>(() => linkedWorkspace)
+  const [cloudWorkspace, setCloudWorkspace] = useState<CloudWorkspace | null>(() => linkedWorkspace ?? readStoredWorkspace())
   const [isLoadingLinkedWorkspace, setIsLoadingLinkedWorkspace] = useState<boolean>(() => Boolean(linkedWorkspace))
-  const [cloudState, setCloudState] = useState<'idle' | 'saving' | 'saved' | 'error'>(() => linkedWorkspace ? 'saving' : 'idle')
+  const [cloudState, setCloudState] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'unsaved' | 'error'>(() => linkedWorkspace ? 'loading' : 'idle')
   const [canSyncCloud, setCanSyncCloud] = useState(false)
-  const [githubName, setGitHubName] = useState<string | null>(null)
+  const [githubIdentity, setGitHubIdentity] = useState<GitHubIdentity | null>(null)
+  const [gistOwnerLogin, setGistOwnerLogin] = useState<string | null>(null)
   const appShellRef = useRef<HTMLElement | null>(null)
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const importTimerRef = useRef<number | undefined>(undefined)
   const overlayRef = useRef<HTMLPreElement | null>(null)
   const resultsRef = useRef<HTMLOutputElement | null>(null)
+  const lastSavedSourceRef = useRef<string | null>(null)
+  const currentSourceRef = useRef(source)
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -109,6 +117,8 @@ function App() {
 
   useEffect(() => () => window.clearTimeout(importTimerRef.current), [])
 
+  useEffect(() => { currentSourceRef.current = source }, [source])
+
   useEffect(() => {
     let cancelled = false
 
@@ -116,8 +126,10 @@ function App() {
       try {
         const response = await fetch('/.netlify/functions/github-user')
         if (!response.ok) return
-        const user = await response.json() as { name?: unknown }
-        if (!cancelled && typeof user.name === 'string' && user.name) setGitHubName(user.name)
+        const user = await response.json() as { login?: unknown, name?: unknown }
+        if (!cancelled && typeof user.login === 'string' && typeof user.name === 'string' && user.login && user.name) {
+          setGitHubIdentity({ login: user.login, name: user.name })
+        }
       } catch {
         // GitHub is optional, so a missing session should remain quiet.
       }
@@ -149,12 +161,13 @@ function App() {
       try {
         const response = await fetch(`/.netlify/functions/github-gists?id=${workspace.gistId}`)
         if (!response.ok) throw new Error('This workspace could not be loaded from GitHub.')
-        const gist = await response.json() as { files?: Record<string, { content?: string }> }
+        const gist = await response.json() as { files?: Record<string, { content?: string }>, owner?: { login?: unknown } }
         const encrypted = gist.files?.['num-workbook.enc']?.content
         if (!encrypted) throw new Error('This Gist is not a Num workspace.')
         const nextSource = await decryptWorkbook(encrypted, workspace.key)
         if (cancelled) return
-        storeWorkspace(workspace)
+        setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : null)
+        lastSavedSourceRef.current = nextSource
         setSource(nextSource)
         setCloudState('saved')
       } catch (error) {
@@ -170,6 +183,31 @@ function App() {
     void loadLinkedWorkspace()
     return () => { cancelled = true }
   }, [linkedWorkspace])
+
+  useEffect(() => {
+    if (!cloudWorkspace || linkedWorkspace) return undefined
+    const workspace = cloudWorkspace
+    let cancelled = false
+
+    async function loadGistOwner(): Promise<void> {
+      try {
+        const response = await fetch(`/.netlify/functions/github-gists?id=${workspace.gistId}`)
+        if (!response.ok) return
+        const gist = await response.json() as { owner?: { login?: unknown } }
+        if (!cancelled) setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : null)
+      } catch {
+        // Saving will show a useful error if the user explicitly requests it.
+      }
+    }
+
+    void loadGistOwner()
+    return () => { cancelled = true }
+  }, [cloudWorkspace, linkedWorkspace])
+
+  useEffect(() => {
+    if (!githubIdentity || !cloudWorkspace) return
+    if (!linkedWorkspace || gistOwnerLogin === githubIdentity.login) setCanSyncCloud(true)
+  }, [cloudWorkspace, gistOwnerLogin, githubIdentity, linkedWorkspace])
 
   useEffect(() => {
     const url = new URL(window.location.href)
@@ -213,6 +251,7 @@ function App() {
         storeWorkspace(nextWorkspace)
         setCloudWorkspace(nextWorkspace)
         setCanSyncCloud(true)
+        lastSavedSourceRef.current = source
         window.history.replaceState(window.history.state, '', workspaceUrl(nextWorkspace))
         setCloudState('saved')
       } catch (error) {
@@ -227,29 +266,38 @@ function App() {
     return () => { cancelled = true }
   }, [source])
 
-  useEffect(() => {
-    if (!cloudWorkspace || !canSyncCloud || isLoadingLinkedWorkspace) return undefined
-    const workspace = cloudWorkspace
-    const timeout = window.setTimeout(() => {
-      async function saveCloudWorkspace(): Promise<void> {
-        try {
-          setCloudState('saving')
-          const encrypted = await encryptWorkbook(source, workspace.key)
-          const response = await fetch(`/.netlify/functions/github-gists?id=${workspace.gistId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: encrypted, description: `nums/${workspace.sqid}` }),
-          })
-          if (!response.ok) throw new Error('GitHub could not save the workspace.')
-          setCloudState('saved')
-        } catch (error) {
-          setCloudState('error')
-          setShareState(error instanceof Error ? error.message : 'Could not save the GitHub workspace.')
-        }
-      }
+  async function saveCloudWorkspace(): Promise<void> {
+    if (!cloudWorkspace || !canSyncCloud) {
+      setCloudState('error')
+      setShareState('This workbook is not connected to a writable GitHub Gist.')
+      return
+    }
 
-      void saveCloudWorkspace()
-    }, CLOUD_SYNC_DELAY)
+    const workspace = cloudWorkspace
+    const sourceSnapshot = source
+    try {
+      setCloudState('saving')
+      const encrypted = await encryptWorkbook(sourceSnapshot, workspace.key)
+      const response = await fetch(`/.netlify/functions/github-gists?id=${workspace.gistId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: encrypted, description: `nums/${workspace.sqid}` }),
+      })
+      if (!response.ok) throw new Error('GitHub could not save the workspace.')
+      lastSavedSourceRef.current = sourceSnapshot
+      setCloudState(sourceSnapshot === currentSourceRef.current ? 'saved' : 'unsaved')
+    } catch (error) {
+      setCloudState('error')
+      setShareState(error instanceof Error ? error.message : 'Could not save the GitHub workspace.')
+    }
+  }
+
+  useEffect(() => {
+    if (!cloudWorkspace || isLoadingLinkedWorkspace || lastSavedSourceRef.current === source) return undefined
+    setCloudState('unsaved')
+    if (!canSyncCloud) return undefined
+
+    const timeout = window.setTimeout(() => { void saveCloudWorkspace() }, CLOUD_SYNC_DELAY)
     return () => window.clearTimeout(timeout)
   }, [canSyncCloud, cloudWorkspace, isLoadingLinkedWorkspace, source])
 
@@ -296,8 +344,14 @@ function App() {
     }
   }
 
-  const cloudActivity = cloudState === 'saving'
-    ? (isLoadingLinkedWorkspace ? 'Loading…' : 'Saving…')
+  const cloudActivity = cloudState === 'loading'
+    ? 'Loading…'
+    : cloudState === 'saving'
+      ? 'Saving…'
+      : cloudState === 'unsaved'
+        ? 'Unsaved'
+        : cloudState === 'saved' && cloudWorkspace
+          ? 'Saved'
     : cloudState === 'error'
       ? 'Couldn’t save'
       : ''
@@ -342,9 +396,12 @@ function App() {
 
   return (
     <main className="app-shell" ref={appShellRef}>
-      {(githubName || cloudActivity) && (
+      {(githubIdentity || cloudActivity) && (
         <div className={`account-status${cloudState === 'error' ? ' error' : ''}`} aria-live="polite">
-          {githubName && <span className="account-name">Hello {githubName}</span>}
+          {githubIdentity && <span className="account-name">Hello {githubIdentity.name}</span>}
+          {githubIdentity && cloudWorkspace && canSyncCloud && (
+            <button className="save-button" onClick={() => { void saveCloudWorkspace() }} disabled={cloudState === 'saving'}>Save</button>
+          )}
           {cloudActivity && <span className="cloud-activity">{cloudState === 'saving' && <i aria-hidden="true" />}{cloudActivity}</span>}
         </div>
       )}
@@ -357,7 +414,7 @@ function App() {
           title="Import workbook"
         >{importState === 'done' ? '✓' : importState === 'error' ? '!' : '↑'}</button>
         <button className="button icon" onClick={() => exportWorkbook(source)} aria-label="Download workbook">↓</button>
-        <button className="button github" onClick={connectGitHub}>GitHub</button>
+        {!githubIdentity && <button className="button github" onClick={connectGitHub}>GitHub</button>}
         <button className="button share" onClick={copyShareLink}>{shareState === 'Link copied' ? 'Copied' : 'Copy link'}</button>
       </nav>
 

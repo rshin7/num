@@ -35,6 +35,19 @@ button { cursor: pointer; }
   font-weight: 600;
 }
 .account-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.save-button {
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid #ffffff17;
+  border-radius: 7px;
+  color: #baf0cf;
+  background: #ffffff08;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 650;
+}
+.save-button:hover:not(:disabled) { color: #e5ffec; background: #ffffff13; }
+.save-button:disabled { cursor: default; opacity: .55; }
 .cloud-activity { display: inline-flex; align-items: center; gap: 6px; color: #989dad; white-space: nowrap; font-size: 12px; }
 .cloud-activity i { width: 11px; height: 11px; border: 1.5px solid #9298ac; border-right-color: transparent; border-radius: 50%; animation: cloud-spin .7s linear infinite; }
 .account-status.error .cloud-activity { color: #fa8a87; }
