@@ -1,14 +1,14 @@
-import { type ChangeEvent, type UIEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { type UIEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createWorkspace, decryptWorkbook, encryptWorkbook, hasOwnerRecovery, recoverWorkspaceKey, workspaceForGist, workspaceFromLocation, workspaceUrl, type CloudWorkspace } from './cloud'
 import { evaluateWorkbook, type WorkbookEvaluation } from './engine'
-import { exportWorkbook, readSharedSource, replaceUrlForSource, sourceFromWorkbookJson } from './share'
+import { readSharedSource, replaceUrlForSource } from './share'
 import './styles.css'
 
 const LOCAL_STORAGE_KEY = 'num:workbook:v2'
 const CLOUD_WORKSPACE_STORAGE_KEY = 'num:github:workspace:v1'
 const CLOUD_SOURCE_STORAGE_PREFIX = 'num:github:workbook:v1:'
-const MAX_IMPORT_BYTES = 1_000_000
+const AUTO_SYNC_STORAGE_KEY = 'num:github:auto-sync:v1'
 const URL_SYNC_DELAY = 300
 const CLOUD_SYNC_DELAY = 2_500
 
@@ -72,6 +72,10 @@ function cloudSourceStorageKey(workspace: CloudWorkspace): string {
   return `${CLOUD_SOURCE_STORAGE_PREFIX}${workspace.gistId}`
 }
 
+function initialAutoSync(): boolean {
+  return localStorage.getItem(AUTO_SYNC_STORAGE_KEY) !== 'false'
+}
+
 function highlight(source: string) {
   const lines = source.split('\n')
   return lines.map((line, index) => {
@@ -92,7 +96,7 @@ function App() {
   const [source, setSource] = useState<string>(initialSource)
   const [workbook, setWorkbook] = useState<WorkbookEvaluation>({ results: [], total: '0' })
   const [shareState, setShareState] = useState<string>('')
-  const [importState, setImportState] = useState<'done' | 'error' | ''>('')
+  const [autoSync, setAutoSync] = useState(initialAutoSync)
   const [linkedWorkspace] = useState<CloudWorkspace | null>(readWorkspaceFromLocation)
   const [cloudWorkspace, setCloudWorkspace] = useState<CloudWorkspace | null>(() => linkedWorkspace ?? (readSharedSource() === null ? readStoredWorkspace() : null))
   const [isLoadingLinkedWorkspace, setIsLoadingLinkedWorkspace] = useState<boolean>(() => Boolean(linkedWorkspace))
@@ -103,8 +107,6 @@ function App() {
   const [needsRecoveryUpgrade, setNeedsRecoveryUpgrade] = useState(false)
   const appShellRef = useRef<HTMLElement | null>(null)
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const importTimerRef = useRef<number | undefined>(undefined)
   const overlayRef = useRef<HTMLPreElement | null>(null)
   const resultsRef = useRef<HTMLOutputElement | null>(null)
   const lastSavedSourceRef = useRef<string | null>(null)
@@ -146,8 +148,6 @@ function App() {
       document.removeEventListener('visibilitychange', refreshWhenVisible)
     }
   }, [])
-
-  useEffect(() => () => window.clearTimeout(importTimerRef.current), [])
 
   useEffect(() => () => {
     if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current)
@@ -382,11 +382,11 @@ function App() {
   useEffect(() => {
     if (!cloudWorkspace || isLoadingLinkedWorkspace || (lastSavedSourceRef.current === source && !needsRecoveryUpgrade)) return undefined
     setCloudState('unsaved')
-    if (!canSyncCloud) return undefined
+    if (!canSyncCloud || !autoSync) return undefined
 
     const timeout = window.setTimeout(() => { void saveCloudWorkspace() }, CLOUD_SYNC_DELAY)
     return () => window.clearTimeout(timeout)
-  }, [canSyncCloud, cloudWorkspace, isLoadingLinkedWorkspace, needsRecoveryUpgrade, source])
+  }, [autoSync, canSyncCloud, cloudWorkspace, isLoadingLinkedWorkspace, needsRecoveryUpgrade, source])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
@@ -483,35 +483,12 @@ function App() {
     window.location.assign(authorizationUrl)
   }
 
-  function showImportState(nextState: 'done' | 'error'): void {
-    window.clearTimeout(importTimerRef.current)
-    setImportState(nextState)
-    importTimerRef.current = window.setTimeout(() => setImportState(''), 2200)
-  }
-
-  function openImportPicker(): void {
-    fileInputRef.current?.click()
-  }
-
-  async function importWorkbook(event: ChangeEvent<HTMLInputElement>): Promise<void> {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) return
-
-    try {
-      if (file.size > MAX_IMPORT_BYTES) throw new Error('This workbook is too large to import.')
-
-      const importedSource = sourceFromWorkbookJson(await file.text())
-      setSource(importedSource)
-      setShareState('')
-      editorRef.current?.scrollTo(0, 0)
-      overlayRef.current?.scrollTo(0, 0)
-      resultsRef.current?.scrollTo(0, 0)
-      showImportState('done')
-    } catch (error) {
-      showImportState('error')
-      setShareState(error instanceof Error ? error.message : 'Could not import workbook.')
-    }
+  function toggleAutoSync(): void {
+    setAutoSync((current) => {
+      const next = !current
+      localStorage.setItem(AUTO_SYNC_STORAGE_KEY, String(next))
+      return next
+    })
   }
 
   return (
@@ -519,23 +496,21 @@ function App() {
       <header className="topbar">
         {(githubIdentity || cloudActivity) && (
           <div className={`account-status${cloudState === 'error' ? ' error' : ''}`} aria-live="polite">
-            {githubIdentity && <span className="account-name">Hello {githubIdentity.name}</span>}
-            {githubIdentity && cloudWorkspace && canSyncCloud && (
-              <button className="save-button" onClick={() => { void saveCloudWorkspace() }} disabled={cloudState === 'saving'}>Save</button>
-            )}
-            {cloudActivity && <span className="cloud-activity">{cloudState === 'saving' && <i aria-hidden="true" />}{cloudActivity}</span>}
-          </div>
-        )}
-        <nav className="actions" aria-label="Workbook actions">
-          <input className="visually-hidden" ref={fileInputRef} type="file" accept="application/json,.json" onChange={importWorkbook} />
-          <button
-            className={`button icon import${importState ? ` ${importState}` : ''}`}
-            onClick={openImportPicker}
-            aria-label={importState === 'error' ? 'Import failed. Try another workbook.' : 'Import workbook'}
-            title="Import workbook"
-          >{importState === 'done' ? '✓' : importState === 'error' ? '!' : '↑'}</button>
-          <button className="button icon" onClick={() => exportWorkbook(source)} aria-label="Download workbook">↓</button>
-          {!githubIdentity && <button className="button github" onClick={connectGitHub}>GitHub</button>}
+            {githubIdentity && <span className="account-name">Hello, {githubIdentity.name}</span>}
+          {githubIdentity && cloudWorkspace && canSyncCloud && (
+            <button className="save-button" onClick={() => { void saveCloudWorkspace() }} disabled={cloudState === 'saving'}>Save</button>
+          )}
+          {githubIdentity && cloudWorkspace && canSyncCloud && (
+            <label className="sync-toggle">
+              <span>Auto</span>
+              <input type="checkbox" checked={autoSync} onChange={toggleAutoSync} aria-label="Automatically save after typing" />
+            </label>
+          )}
+          {cloudActivity && <span className="cloud-activity">{cloudState === 'saving' && <i aria-hidden="true" />}{cloudActivity}</span>}
+        </div>
+      )}
+      <nav className="actions" aria-label="Workbook actions">
+          {!githubIdentity && <button className="button github" onClick={connectGitHub}>Login with GitHub</button>}
           <button className="button share" onClick={copyShareLink}>{shareState === 'Link copied' ? 'Copied' : 'Copy link'}</button>
         </nav>
       </header>
@@ -571,7 +546,8 @@ function App() {
         </div>
       </section>
       <div className="floating-total" aria-live="polite"><span>Total</span><b>{workbook.total}</b></div>
-      <span className="visually-hidden" aria-live="polite">{shareState || (importState === 'done' ? 'Workbook imported.' : '')}</span>
+      <footer className="site-footer">nums is made by <a href="https://www.rshin.org" target="_blank" rel="noreferrer">Richard Shin</a></footer>
+      <span className="visually-hidden" aria-live="polite">{shareState}</span>
     </main>
   )
 }

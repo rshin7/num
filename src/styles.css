@@ -54,6 +54,33 @@ button { cursor: pointer; }
 }
 .save-button:hover:not(:disabled) { color: #e5ffec; background: #ffffff13; }
 .save-button:disabled { cursor: default; opacity: .55; }
+.sync-toggle { display: inline-flex; align-items: center; gap: 5px; color: #989dad; font-size: 11px; font-weight: 650; }
+.sync-toggle input {
+  position: relative;
+  width: 27px;
+  height: 16px;
+  margin: 0;
+  appearance: none;
+  border: 1px solid #ffffff1b;
+  border-radius: 99px;
+  background: #ffffff13;
+  cursor: pointer;
+  transition: background .14s ease;
+}
+.sync-toggle input::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #9298ac;
+  content: '';
+  transition: transform .14s ease, background .14s ease;
+}
+.sync-toggle input:checked { background: #5cbf7b66; }
+.sync-toggle input:checked::after { background: #d5f8df; transform: translateX(11px); }
+.sync-toggle input:focus-visible { outline: 2px solid #9ac8ff; outline-offset: 2px; }
 .cloud-activity { display: inline-flex; align-items: center; gap: 6px; color: #989dad; white-space: nowrap; font-size: 12px; }
 .cloud-activity i { width: 11px; height: 11px; border: 1.5px solid #9298ac; border-right-color: transparent; border-radius: 50%; animation: cloud-spin .7s linear infinite; }
 .account-status.error .cloud-activity { color: #fa8a87; }
@@ -73,8 +100,6 @@ button { cursor: pointer; }
 .button:hover { color: #ffffff; background: #ffffff13; }
 .button.icon { padding: 0; color: #9298ac; font-size: 18px; font-weight: 400; }
 .button.share { color: #baf0cf; border-color: #baf0cf18; }
-.button.import.done { color: #baf0cf; }
-.button.import.error { color: #fa8a87; }
 
 .workspace {
   width: min(1100px, 100%);
@@ -144,6 +169,17 @@ button { cursor: pointer; }
 }
 .floating-total span { color: #989dad; font-size: 11px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
 .floating-total b { margin-left: auto; color: #f1f5f3; font-family: "SF Mono", "Cascadia Code", ui-monospace, monospace; font-size: 19px; letter-spacing: -.06em; }
+.site-footer {
+  position: fixed;
+  z-index: 3;
+  bottom: 3px;
+  left: 50%;
+  color: #777d90;
+  font-size: 11px;
+  transform: translateX(-50%);
+}
+.site-footer a { color: inherit; text-underline-offset: 2px; }
+.site-footer a:hover { color: #c7cada; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; clip-path: inset(50%); }
 
 @media (max-width: 700px) {
@@ -157,7 +193,7 @@ button { cursor: pointer; }
     padding-bottom: max(10px, env(safe-area-inset-bottom));
     padding-left: max(10px, env(safe-area-inset-left));
     display: grid;
-    grid-template-rows: 36px minmax(0, 1fr) auto;
+    grid-template-rows: 36px minmax(0, 1fr) auto auto;
     place-items: stretch;
     gap: 10px;
     overflow: hidden;
@@ -173,6 +209,7 @@ button { cursor: pointer; }
   .account-name { flex: 1 1 auto; min-width: 0; }
   .cloud-activity { flex: none; font-size: 11px; }
   .save-button { flex: none; }
+  .sync-toggle { flex: none; }
   .workspace {
     width: 100%;
     height: auto;
@@ -204,6 +241,7 @@ button { cursor: pointer; }
     transform: none;
   }
   .floating-total b { font-size: 16px; }
+  .site-footer { position: static; justify-self: center; font-size: 10px; transform: none; }
 }
 
 @media (max-width: 390px) {
@@ -211,4 +249,5 @@ button { cursor: pointer; }
   .actions { gap: 4px; }
   .button.share { padding: 0 8px; }
   .cloud-activity { font-size: 10px; }
+  .sync-toggle span { display: none; }
 }

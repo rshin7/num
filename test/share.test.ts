@@ -17,7 +17,7 @@ globalThis.window = {
   },
 } as unknown as Window & typeof globalThis
 
-const { readSharedSource, replaceUrlForSource, shareUrl, sourceFromWorkbookJson } = await import('../src/share')
+const { readSharedSource, replaceUrlForSource, shareUrl } = await import('../src/share')
 
 test('round-trips a workbook through the compressed share fragment', () => {
   const source = 'coffee = $4.50\ncoffee * 2 # morning and afternoon'
@@ -35,15 +35,4 @@ test('replaces the current URL instead of adding a history entry', () => {
   assert.match(new URL(url).hash, /^#n=/)
   assert.equal(replaceUrlForSource(''), 'https://num.example/')
   assert.equal(replacedUrls.at(-1), 'https://num.example/')
-})
-
-test('imports a valid exported workbook', () => {
-  const source = 'income = $3,500\nincome - $1,450 # rent'
-  assert.equal(sourceFromWorkbookJson(JSON.stringify({ version: 1, source })), source)
-})
-
-test('rejects malformed and incompatible workbook imports', () => {
-  assert.throws(() => sourceFromWorkbookJson('{bad json'), /valid Num workbook/)
-  assert.throws(() => sourceFromWorkbookJson(JSON.stringify({ version: 2, source: '' })), /unsupported version/)
-  assert.throws(() => sourceFromWorkbookJson(JSON.stringify({ version: 1 })), /no calculator source/)
 })

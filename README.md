@@ -9,7 +9,7 @@ It is an independent open-source project, released under the Apache License 2.0.
 - Exact base-10 calculations with C# `decimal`, including money amounts.
 - Variables, parentheses, percentages, `abs`, `round`, `min`, and `max`.
 - Currency-aware `$`, `€`, `£`, and `¥` arithmetic.
-- Notes with `#`, local browser persistence, compressed URL sharing, and JSON import/export.
+- Notes with `#`, local browser persistence, and compressed URL sharing.
 - Optional encrypted GitHub Gist sync with a compact link key.
 - A responsive editor/results layout for desktop and mobile screens.
 
@@ -92,7 +92,7 @@ Assignments set variables but do not add to the running total. Ordinary expressi
 
 ## Data and sharing
 
-The active workbook is stored in the browser's `localStorage`; Num has no database. Without GitHub sync, the workbook is compressed into the URL fragment after a brief pause in typing, so the address bar is always ready to share without adding browser-history entries. The fragment is self-contained and is not sent to a web server. With GitHub sync, the link contains only the encrypted-Gist locator and decryption key. Use **Copy link** to copy it, **↓** to export JSON, and **↑** to import a previously exported workbook. Imports are validated before replacing the active workbook.
+The active workbook is stored in the browser's `localStorage`; Num has no database. Without GitHub sync, the workbook is compressed into the URL fragment after a brief pause in typing, so the address bar is always ready to share without adding browser-history entries. The fragment is self-contained and is not sent to a web server. With GitHub sync, the link contains only the encrypted-Gist locator and decryption key. Use **Copy link** to share the current workbook.
 
 ## Project structure
 
