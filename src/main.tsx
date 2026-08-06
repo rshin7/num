@@ -17,6 +17,12 @@ interface GitHubIdentity {
   name: string
 }
 
+interface PendingScrollSync {
+  source: 'editor' | 'results'
+  scrollTop: number
+  scrollLeft: number
+}
+
 function initialSource(): string {
   if (readWorkspaceFromLocation()) return ''
   const sharedSource = readSharedSource()
@@ -90,6 +96,10 @@ function App() {
   const resultsRef = useRef<HTMLOutputElement | null>(null)
   const lastSavedSourceRef = useRef<string | null>(null)
   const currentSourceRef = useRef(source)
+  const scrollFrameRef = useRef<number | null>(null)
+  const pendingScrollRef = useRef<PendingScrollSync | null>(null)
+  const ignoredEditorScrollTopRef = useRef<number | null>(null)
+  const ignoredResultsScrollTopRef = useRef<number | null>(null)
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -125,6 +135,10 @@ function App() {
   }, [])
 
   useEffect(() => () => window.clearTimeout(importTimerRef.current), [])
+
+  useEffect(() => () => {
+    if (scrollFrameRef.current !== null) window.cancelAnimationFrame(scrollFrameRef.current)
+  }, [])
 
   useEffect(() => { currentSourceRef.current = source }, [source])
 
@@ -330,19 +344,52 @@ function App() {
 
   const lines = useMemo<string[]>(() => source.split('\n'), [source])
 
+  function scheduleScrollSync(next: PendingScrollSync): void {
+    pendingScrollRef.current = next
+    if (scrollFrameRef.current !== null) return
+
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = null
+      const pending = pendingScrollRef.current
+      pendingScrollRef.current = null
+      if (!pending) return
+
+      if (pending.source === 'editor') {
+        if (overlayRef.current) {
+          if (overlayRef.current.scrollTop !== pending.scrollTop) overlayRef.current.scrollTop = pending.scrollTop
+          if (overlayRef.current.scrollLeft !== pending.scrollLeft) overlayRef.current.scrollLeft = pending.scrollLeft
+        }
+        if (resultsRef.current && resultsRef.current.scrollTop !== pending.scrollTop) {
+          ignoredResultsScrollTopRef.current = pending.scrollTop
+          resultsRef.current.scrollTop = pending.scrollTop
+        }
+        return
+      }
+
+      if (editorRef.current && editorRef.current.scrollTop !== pending.scrollTop) {
+        ignoredEditorScrollTopRef.current = pending.scrollTop
+        editorRef.current.scrollTop = pending.scrollTop
+      }
+      if (overlayRef.current && overlayRef.current.scrollTop !== pending.scrollTop) overlayRef.current.scrollTop = pending.scrollTop
+    })
+  }
+
   function syncEditorScroll(event: UIEvent<HTMLTextAreaElement>): void {
     const { scrollLeft, scrollTop } = event.currentTarget
-    if (overlayRef.current) {
-      overlayRef.current.scrollTop = scrollTop
-      overlayRef.current.scrollLeft = scrollLeft
+    if (ignoredEditorScrollTopRef.current === scrollTop) {
+      ignoredEditorScrollTopRef.current = null
+      return
     }
-    if (resultsRef.current) resultsRef.current.scrollTop = scrollTop
+    scheduleScrollSync({ source: 'editor', scrollTop, scrollLeft })
   }
 
   function syncResultsScroll(event: UIEvent<HTMLOutputElement>): void {
     const { scrollTop } = event.currentTarget
-    if (editorRef.current) editorRef.current.scrollTop = scrollTop
-    if (overlayRef.current) overlayRef.current.scrollTop = scrollTop
+    if (ignoredResultsScrollTopRef.current === scrollTop) {
+      ignoredResultsScrollTopRef.current = null
+      return
+    }
+    scheduleScrollSync({ source: 'results', scrollTop, scrollLeft: 0 })
   }
 
   async function copyShareLink(): Promise<void> {
