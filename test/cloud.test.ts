@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-const { decryptWorkbook, encryptWorkbook, gistIdToSqid, sqidToGistId } = await import('../src/cloud')
+const { decryptWorkbook, encryptWorkbook, gistIdToSqid, hasOwnerRecovery, recoverWorkspaceKey, sqidToGistId } = await import('../src/cloud')
 
 test('round-trips GitHub Gist IDs through a Sqid', () => {
   const gistId = '0a17be398d1f2468c0ffee1234567890'
@@ -27,4 +27,15 @@ test('rejects the wrong workspace key', async () => {
     decryptWorkbook(encrypted, 'YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4eXowMTIzNDU2Nzg'),
     /cannot decrypt/,
   )
+})
+
+test('recovers a shared-link key for its authenticated owner', async () => {
+  const workspaceKey = Buffer.alloc(32, 17).toString('base64url')
+  const ownerRecoveryKey = Buffer.alloc(32, 42).toString('base64url')
+  const encrypted = await encryptWorkbook('income - rent', workspaceKey, ownerRecoveryKey)
+
+  assert.equal(hasOwnerRecovery(encrypted), true)
+  assert.equal(await recoverWorkspaceKey(encrypted, ownerRecoveryKey), workspaceKey)
+  assert.equal(await decryptWorkbook(encrypted, await recoverWorkspaceKey(encrypted, ownerRecoveryKey)), 'income - rent')
+  await assert.rejects(recoverWorkspaceKey(encrypted, Buffer.alloc(32, 99).toString('base64url')), /could not recover/)
 })

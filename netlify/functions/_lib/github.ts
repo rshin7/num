@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes, timingSafeEqual } from 'node:crypto'
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto'
 
 const GITHUB_API_URL = 'https://api.github.com'
 const GITHUB_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize'
@@ -71,6 +71,13 @@ export function sessionCookie(request: Request, session: GitHubSession): string 
 
 export function clearSessionCookie(request: Request): string {
   return clearCookie(request, SESSION_COOKIE)
+}
+
+export function workspaceRecoveryKey(githubUserId: number): string {
+  if (!Number.isSafeInteger(githubUserId) || githubUserId <= 0) throw new Error('GitHub did not return a valid account ID.')
+  return createHmac('sha256', encryptionKey())
+    .update(`num-workspace-recovery:v1:${githubUserId}`)
+    .digest('base64url')
 }
 
 export function startGitHubAuthorization(request: Request): { authorizationUrl: string, cookie: string } {

@@ -15,6 +15,10 @@ export default async function githubGists(request: Request, _context: Context): 
   try {
     const url = new URL(request.url)
     if (request.method === 'GET') {
+      if (url.searchParams.get('mine') === '1') {
+        const { session, refreshedCookie } = await authenticatedSession(request)
+        return githubResponse(await githubRequest(session, '/gists?per_page=100'), refreshedCookie)
+      }
       return githubResponse(await publicGitHubRequest(`/gists/${requiredGistId(url)}`))
     }
 

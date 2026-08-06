@@ -1,6 +1,6 @@
 import { type ChangeEvent, type UIEvent, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { createWorkspace, decryptWorkbook, encryptWorkbook, workspaceForGist, workspaceFromLocation, workspaceUrl, type CloudWorkspace } from './cloud'
+import { createWorkspace, decryptWorkbook, encryptWorkbook, hasOwnerRecovery, recoverWorkspaceKey, workspaceForGist, workspaceFromLocation, workspaceUrl, type CloudWorkspace } from './cloud'
 import { evaluateWorkbook, type WorkbookEvaluation } from './engine'
 import { exportWorkbook, readSharedSource, replaceUrlForSource, sourceFromWorkbookJson } from './share'
 import './styles.css'
@@ -15,12 +15,24 @@ const CLOUD_SYNC_DELAY = 2_500
 interface GitHubIdentity {
   login: string
   name: string
+  recoveryKey: string
 }
 
 interface PendingScrollSync {
   source: 'editor' | 'results'
   scrollTop: number
   scrollLeft: number
+}
+
+interface GitHubGistSummary {
+  id?: unknown
+  description?: unknown
+}
+
+interface GitHubGist {
+  id?: unknown
+  files?: Record<string, { content?: string }>
+  owner?: { login?: unknown }
 }
 
 function initialSource(): string {
@@ -88,6 +100,7 @@ function App() {
   const [canSyncCloud, setCanSyncCloud] = useState(false)
   const [githubIdentity, setGitHubIdentity] = useState<GitHubIdentity | null>(null)
   const [gistOwnerLogin, setGistOwnerLogin] = useState<string | null>(null)
+  const [needsRecoveryUpgrade, setNeedsRecoveryUpgrade] = useState(false)
   const appShellRef = useRef<HTMLElement | null>(null)
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -149,9 +162,9 @@ function App() {
       try {
         const response = await fetch('/.netlify/functions/github-user')
         if (!response.ok) return
-        const user = await response.json() as { login?: unknown, name?: unknown }
-        if (!cancelled && typeof user.login === 'string' && typeof user.name === 'string' && user.login && user.name) {
-          setGitHubIdentity({ login: user.login, name: user.name })
+        const user = await response.json() as { login?: unknown, name?: unknown, recoveryKey?: unknown }
+        if (!cancelled && typeof user.login === 'string' && typeof user.name === 'string' && typeof user.recoveryKey === 'string' && user.login && user.name && user.recoveryKey) {
+          setGitHubIdentity({ login: user.login, name: user.name, recoveryKey: user.recoveryKey })
         }
       } catch {
         // GitHub is optional, so a missing session should remain quiet.
@@ -190,6 +203,7 @@ function App() {
         const nextSource = await decryptWorkbook(encrypted, workspace.key)
         if (cancelled) return
         setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : null)
+        setNeedsRecoveryUpgrade(!hasOwnerRecovery(encrypted))
         lastSavedSourceRef.current = nextSource
         setSource(nextSource)
         setCloudState('saved')
@@ -216,8 +230,12 @@ function App() {
       try {
         const response = await fetch(`/.netlify/functions/github-gists?id=${workspace.gistId}`)
         if (!response.ok) return
-        const gist = await response.json() as { owner?: { login?: unknown } }
-        if (!cancelled) setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : null)
+        const gist = await response.json() as { files?: Record<string, { content?: string }>, owner?: { login?: unknown } }
+        if (!cancelled) {
+          setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : null)
+          const encrypted = gist.files?.['num-workbook.enc']?.content
+          if (encrypted) setNeedsRecoveryUpgrade(!hasOwnerRecovery(encrypted))
+        }
       } catch {
         // Saving will show a useful error if the user explicitly requests it.
       }
@@ -238,24 +256,64 @@ function App() {
   useEffect(() => {
     const url = new URL(window.location.href)
     if (url.searchParams.get('github') !== 'connected') return
+    if (!githubIdentity) return
+    const identity = githubIdentity
     url.searchParams.delete('github')
     window.history.replaceState(window.history.state, '', url)
 
-    const previousWorkspace = readStoredWorkspace()
-    if (previousWorkspace) {
-      setCloudWorkspace(previousWorkspace)
-      setCanSyncCloud(true)
-      window.history.replaceState(window.history.state, '', workspaceUrl(previousWorkspace))
+    const knownWorkspace = readStoredWorkspace() ?? cloudWorkspace
+    if (knownWorkspace) {
+      setCloudWorkspace(knownWorkspace)
+      window.history.replaceState(window.history.state, '', workspaceUrl(knownWorkspace))
       setCloudState('saved')
       return
     }
 
     let cancelled = false
-    async function createCloudWorkspace(): Promise<void> {
+    async function connectCloudWorkspace(): Promise<void> {
       try {
+        setCloudState('loading')
+        const recoveryResponse = await fetch('/.netlify/functions/github-gists?mine=1')
+        if (!recoveryResponse.ok) throw new Error('GitHub could not look for your existing workspace.')
+        const summaries = await recoveryResponse.json() as GitHubGistSummary[]
+        const candidates = summaries.filter((gist) => typeof gist.id === 'string' && typeof gist.description === 'string' && gist.description.startsWith('nums/'))
+
+        let legacyWorkspaceFound = false
+        for (const candidate of candidates) {
+          const response = await fetch(`/.netlify/functions/github-gists?id=${candidate.id}`)
+          if (!response.ok) continue
+          const gist = await response.json() as GitHubGist
+          const encrypted = gist.files?.['num-workbook.enc']?.content
+          if (!encrypted || typeof gist.id !== 'string') continue
+
+          try {
+            const key = await recoverWorkspaceKey(encrypted, identity.recoveryKey)
+            const recoveredSource = await decryptWorkbook(encrypted, key)
+            if (cancelled) return
+
+            const workspace = workspaceForGist(gist.id, key)
+            storeWorkspace(workspace)
+            setCloudWorkspace(workspace)
+            setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : identity.login)
+            setCanSyncCloud(true)
+            setNeedsRecoveryUpgrade(false)
+            lastSavedSourceRef.current = recoveredSource
+            setSource(recoveredSource)
+            window.history.replaceState(window.history.state, '', workspaceUrl(workspace))
+            setCloudState('saved')
+            return
+          } catch (error) {
+            if (error instanceof Error && /original share link/.test(error.message)) legacyWorkspaceFound = true
+          }
+        }
+
+        if (legacyWorkspaceFound) {
+          throw new Error('Your existing workspace needs its original share link once before it can be opened on a new device.')
+        }
+
         setCloudState('saving')
         const draft = createWorkspace()
-        const encrypted = await encryptWorkbook(source, draft.key)
+        const encrypted = await encryptWorkbook(source, draft.key, identity.recoveryKey)
         const createResponse = await fetch('/.netlify/functions/github-gists', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -276,7 +334,9 @@ function App() {
 
         storeWorkspace(nextWorkspace)
         setCloudWorkspace(nextWorkspace)
+        setGistOwnerLogin(identity.login)
         setCanSyncCloud(true)
+        setNeedsRecoveryUpgrade(false)
         lastSavedSourceRef.current = source
         window.history.replaceState(window.history.state, '', workspaceUrl(nextWorkspace))
         setCloudState('saved')
@@ -288,12 +348,12 @@ function App() {
       }
     }
 
-    void createCloudWorkspace()
+    void connectCloudWorkspace()
     return () => { cancelled = true }
-  }, [source])
+  }, [cloudWorkspace, githubIdentity, source])
 
   async function saveCloudWorkspace(): Promise<void> {
-    if (!cloudWorkspace || !canSyncCloud) {
+    if (!cloudWorkspace || !canSyncCloud || !githubIdentity) {
       setCloudState('error')
       setShareState('This workbook is not connected to a writable GitHub Gist.')
       return
@@ -303,7 +363,7 @@ function App() {
     const sourceSnapshot = source
     try {
       setCloudState('saving')
-      const encrypted = await encryptWorkbook(sourceSnapshot, workspace.key)
+      const encrypted = await encryptWorkbook(sourceSnapshot, workspace.key, githubIdentity.recoveryKey)
       const response = await fetch(`/.netlify/functions/github-gists?id=${workspace.gistId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -311,6 +371,7 @@ function App() {
       })
       if (!response.ok) throw new Error('GitHub could not save the workspace.')
       lastSavedSourceRef.current = sourceSnapshot
+      setNeedsRecoveryUpgrade(false)
       setCloudState(sourceSnapshot === currentSourceRef.current ? 'saved' : 'unsaved')
     } catch (error) {
       setCloudState('error')
@@ -319,13 +380,13 @@ function App() {
   }
 
   useEffect(() => {
-    if (!cloudWorkspace || isLoadingLinkedWorkspace || lastSavedSourceRef.current === source) return undefined
+    if (!cloudWorkspace || isLoadingLinkedWorkspace || (lastSavedSourceRef.current === source && !needsRecoveryUpgrade)) return undefined
     setCloudState('unsaved')
     if (!canSyncCloud) return undefined
 
     const timeout = window.setTimeout(() => { void saveCloudWorkspace() }, CLOUD_SYNC_DELAY)
     return () => window.clearTimeout(timeout)
-  }, [canSyncCloud, cloudWorkspace, isLoadingLinkedWorkspace, source])
+  }, [canSyncCloud, cloudWorkspace, isLoadingLinkedWorkspace, needsRecoveryUpgrade, source])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {

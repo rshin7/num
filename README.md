@@ -55,13 +55,19 @@ in `netlify.toml` or the repository. Use a unique `NUM_SESSION_SECRET` of at
 least 32 characters.
 
 After configuration, use **GitHub** in the top-right corner. The first sign-in
-creates one secret Gist for the current workbook; subsequent edits update that
-same Gist. Before upload, the browser encrypts the workbook with AES-GCM. Its
-share link is shaped like `/gist/<id>#<key>`: the short ID finds the Gist, and
-the fragment key decrypts it. The key never reaches Netlify, GitHub, or server
-logs. Keep the complete link: anyone with it can read the workbook, and a lost
-key cannot be recovered. A person opening a link can read it without signing
-in; they do not automatically get permission to overwrite the owner's Gist.
+creates one secret Gist for the current workbook; a later sign-in on another
+device finds and opens that same Gist. Subsequent edits update it in place.
+
+Before upload, the browser encrypts the workbook with AES-GCM. Its share link
+is shaped like `/gist/<id>#<key>`: the short ID finds the Gist, and the fragment
+key decrypts it. The link key never reaches Netlify, GitHub, or server logs.
+For cross-device recovery, the Gist also stores that link key wrapped with a
+per-GitHub-user recovery key. Netlify derives that recovery key from the
+authenticated GitHub user and `NUM_SESSION_SECRET`, then returns it only to
+that authenticated browser session. Therefore, do not rotate
+`NUM_SESSION_SECRET` while you need GitHub recovery for existing workbooks.
+Anyone with the complete share link can read the workbook; a person opening a
+link does not automatically get permission to overwrite the owner's Gist.
 
 ## Commands
 

@@ -16,6 +16,13 @@ interface EncryptedWorkbook {
   algorithm: 'AES-GCM'
   iv: string
   ciphertext: string
+  ownerRecovery?: WrappedWorkspaceKey
+}
+
+interface WrappedWorkspaceKey {
+  algorithm: 'AES-GCM'
+  iv: string
+  ciphertext: string
 }
 
 export function createWorkspace(): CloudWorkspace {
@@ -72,7 +79,7 @@ export function workspaceUrl(workspace: CloudWorkspace): string {
   return url.toString()
 }
 
-export async function encryptWorkbook(source: string, key: string): Promise<string> {
+export async function encryptWorkbook(source: string, key: string, ownerRecoveryKey?: string): Promise<string> {
   const iv = new Uint8Array(12)
   crypto.getRandomValues(iv)
   const plaintext = new TextEncoder().encode(JSON.stringify({ version: 1, source }))
@@ -83,17 +90,12 @@ export async function encryptWorkbook(source: string, key: string): Promise<stri
     iv: bytesToBase64Url(iv),
     ciphertext: bytesToBase64Url(new Uint8Array(ciphertext)),
   }
+  if (ownerRecoveryKey) envelope.ownerRecovery = await wrapWorkspaceKey(key, ownerRecoveryKey)
   return JSON.stringify(envelope)
 }
 
 export async function decryptWorkbook(encrypted: string, key: string): Promise<string> {
-  let envelope: unknown
-  try {
-    envelope = JSON.parse(encrypted)
-  } catch {
-    throw new Error('This Gist does not contain a valid Num workspace.')
-  }
-  if (!isEncryptedWorkbook(envelope)) throw new Error('This Gist does not contain a valid Num workspace.')
+  const envelope = parseEncryptedWorkbook(encrypted)
 
   try {
     const plaintext = await crypto.subtle.decrypt(
@@ -109,10 +111,67 @@ export async function decryptWorkbook(encrypted: string, key: string): Promise<s
   }
 }
 
+export function hasOwnerRecovery(encrypted: string): boolean {
+  const envelope = parseEncryptedWorkbook(encrypted)
+  return envelope.ownerRecovery !== undefined
+}
+
+export async function recoverWorkspaceKey(encrypted: string, ownerRecoveryKey: string): Promise<string> {
+  const envelope = parseEncryptedWorkbook(encrypted)
+  if (!envelope.ownerRecovery) throw new Error('Open this workspace once with its original share link to enable GitHub recovery.')
+
+  try {
+    const key = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: arrayBuffer(base64UrlToBytes(envelope.ownerRecovery.iv)) },
+      await cryptoKey(ownerRecoveryKey, ['decrypt']),
+      arrayBuffer(base64UrlToBytes(envelope.ownerRecovery.ciphertext)),
+    )
+    return validatedWorkspaceKey(bytesToBase64Url(new Uint8Array(key)))
+  } catch {
+    throw new Error('GitHub could not recover this workspace key.')
+  }
+}
+
+async function wrapWorkspaceKey(workspaceKey: string, ownerRecoveryKey: string): Promise<WrappedWorkspaceKey> {
+  const iv = new Uint8Array(12)
+  crypto.getRandomValues(iv)
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    await cryptoKey(ownerRecoveryKey, ['encrypt']),
+    arrayBuffer(base64UrlToBytes(validatedWorkspaceKey(workspaceKey))),
+  )
+  return {
+    algorithm: 'AES-GCM',
+    iv: bytesToBase64Url(iv),
+    ciphertext: bytesToBase64Url(new Uint8Array(ciphertext)),
+  }
+}
+
+function parseEncryptedWorkbook(encrypted: string): EncryptedWorkbook {
+  let envelope: unknown
+  try {
+    envelope = JSON.parse(encrypted)
+  } catch {
+    throw new Error('This Gist does not contain a valid Num workspace.')
+  }
+  if (!isEncryptedWorkbook(envelope)) throw new Error('This Gist does not contain a valid Num workspace.')
+  return envelope
+}
+
 function isEncryptedWorkbook(value: unknown): value is EncryptedWorkbook {
   if (!value || Array.isArray(value) || typeof value !== 'object') return false
   const envelope = value as Partial<EncryptedWorkbook>
-  return envelope.version === ENCRYPTION_VERSION && envelope.algorithm === 'AES-GCM' && typeof envelope.iv === 'string' && typeof envelope.ciphertext === 'string'
+  return envelope.version === ENCRYPTION_VERSION &&
+    envelope.algorithm === 'AES-GCM' &&
+    typeof envelope.iv === 'string' &&
+    typeof envelope.ciphertext === 'string' &&
+    (envelope.ownerRecovery === undefined || isWrappedWorkspaceKey(envelope.ownerRecovery))
+}
+
+function isWrappedWorkspaceKey(value: unknown): value is WrappedWorkspaceKey {
+  if (!value || Array.isArray(value) || typeof value !== 'object') return false
+  const wrappedKey = value as Partial<WrappedWorkspaceKey>
+  return wrappedKey.algorithm === 'AES-GCM' && typeof wrappedKey.iv === 'string' && typeof wrappedKey.ciphertext === 'string'
 }
 
 async function cryptoKey(key: string, usages: KeyUsage[]): Promise<CryptoKey> {
