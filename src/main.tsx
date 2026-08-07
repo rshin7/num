@@ -115,6 +115,7 @@ function App() {
   const pendingScrollRef = useRef<PendingScrollSync | null>(null)
   const ignoredEditorScrollTopRef = useRef<number | null>(null)
   const ignoredResultsScrollTopRef = useRef<number | null>(null)
+  const cloudRefreshInFlightRef = useRef(false)
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -387,6 +388,54 @@ function App() {
     const timeout = window.setTimeout(() => { void saveCloudWorkspace() }, CLOUD_SYNC_DELAY)
     return () => window.clearTimeout(timeout)
   }, [autoSync, canSyncCloud, cloudWorkspace, isLoadingLinkedWorkspace, needsRecoveryUpgrade, source])
+
+  function refreshCloudWorkbook(): void {
+    const workspace = cloudWorkspace
+    const sourceAtStart = currentSourceRef.current
+    if (!workspace || isLoadingLinkedWorkspace || lastSavedSourceRef.current !== sourceAtStart || cloudRefreshInFlightRef.current) return
+
+    cloudRefreshInFlightRef.current = true
+    void (async () => {
+      try {
+        const response = await fetch(`/.netlify/functions/github-gists?id=${workspace.gistId}`, { cache: 'no-store' })
+        if (!response.ok) return
+        const gist = await response.json() as GitHubGist
+        const encrypted = gist.files?.['num-workbook.enc']?.content
+        if (!encrypted) return
+        const remoteSource = await decryptWorkbook(encrypted, workspace.key)
+        if (currentSourceRef.current !== sourceAtStart || lastSavedSourceRef.current !== sourceAtStart) return
+
+        setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : null)
+        setNeedsRecoveryUpgrade(!hasOwnerRecovery(encrypted))
+        lastSavedSourceRef.current = remoteSource
+        if (remoteSource !== sourceAtStart) setSource(remoteSource)
+        setCloudState('saved')
+      } catch {
+        // A passive refresh must never disrupt a usable local workbook.
+      } finally {
+        cloudRefreshInFlightRef.current = false
+      }
+    })()
+  }
+
+  useEffect(() => {
+    if (!cloudWorkspace || isLoadingLinkedWorkspace) return undefined
+
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshCloudWorkbook()
+    }
+
+    window.addEventListener('focus', refreshCloudWorkbook)
+    window.addEventListener('pageshow', refreshCloudWorkbook)
+    window.addEventListener('online', refreshCloudWorkbook)
+    document.addEventListener('visibilitychange', refreshWhenVisible)
+    return () => {
+      window.removeEventListener('focus', refreshCloudWorkbook)
+      window.removeEventListener('pageshow', refreshCloudWorkbook)
+      window.removeEventListener('online', refreshCloudWorkbook)
+      document.removeEventListener('visibilitychange', refreshWhenVisible)
+    }
+  }, [cloudWorkspace, isLoadingLinkedWorkspace, source])
 
   useEffect(() => {
     const timeout = window.setTimeout(() => {
