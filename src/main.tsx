@@ -8,6 +8,7 @@ import './styles.css'
 const LOCAL_STORAGE_KEY = 'num:workbook:v2'
 const CLOUD_WORKSPACE_STORAGE_KEY = 'num:github:workspace:v1'
 const CLOUD_SOURCE_STORAGE_PREFIX = 'num:github:workbook:v1:'
+const CLOUD_SAVED_SOURCE_STORAGE_PREFIX = 'num:github:saved-workbook:v1:'
 const AUTO_SYNC_STORAGE_KEY = 'num:github:auto-sync:v1'
 const URL_SYNC_DELAY = 300
 const CLOUD_SYNC_DELAY = 2_500
@@ -72,6 +73,10 @@ function cloudSourceStorageKey(workspace: CloudWorkspace): string {
   return `${CLOUD_SOURCE_STORAGE_PREFIX}${workspace.gistId}`
 }
 
+function cloudSavedSourceStorageKey(workspace: CloudWorkspace): string {
+  return `${CLOUD_SAVED_SOURCE_STORAGE_PREFIX}${workspace.gistId}`
+}
+
 function initialAutoSync(): boolean {
   return localStorage.getItem(AUTO_SYNC_STORAGE_KEY) !== 'false'
 }
@@ -109,13 +114,23 @@ function App() {
   const editorRef = useRef<HTMLTextAreaElement | null>(null)
   const overlayRef = useRef<HTMLPreElement | null>(null)
   const resultsRef = useRef<HTMLOutputElement | null>(null)
-  const lastSavedSourceRef = useRef<string | null>(null)
+  // Legacy workspaces have no saved-source marker. Treat their cached snapshot
+  // as the initial baseline once, then persist a marker after the next sync.
+  const rememberedSavedSource = cloudWorkspace && !linkedWorkspace
+    ? localStorage.getItem(cloudSavedSourceStorageKey(cloudWorkspace)) ?? source
+    : null
+  const lastSavedSourceRef = useRef<string | null>(rememberedSavedSource)
   const currentSourceRef = useRef(source)
   const scrollFrameRef = useRef<number | null>(null)
   const pendingScrollRef = useRef<PendingScrollSync | null>(null)
   const ignoredEditorScrollTopRef = useRef<number | null>(null)
   const ignoredResultsScrollTopRef = useRef<number | null>(null)
   const cloudRefreshInFlightRef = useRef(false)
+
+  function markCloudSourceSaved(workspace: CloudWorkspace, savedSource: string): void {
+    lastSavedSourceRef.current = savedSource
+    localStorage.setItem(cloudSavedSourceStorageKey(workspace), savedSource)
+  }
 
   useEffect(() => {
     const viewport = window.visualViewport
@@ -205,7 +220,7 @@ function App() {
         if (cancelled) return
         setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : null)
         setNeedsRecoveryUpgrade(!hasOwnerRecovery(encrypted))
-        lastSavedSourceRef.current = nextSource
+        markCloudSourceSaved(workspace, nextSource)
         setSource(nextSource)
         setCloudState('saved')
       } catch (error) {
@@ -298,7 +313,7 @@ function App() {
             setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : identity.login)
             setCanSyncCloud(true)
             setNeedsRecoveryUpgrade(false)
-            lastSavedSourceRef.current = recoveredSource
+            markCloudSourceSaved(workspace, recoveredSource)
             setSource(recoveredSource)
             window.history.replaceState(window.history.state, '', workspaceUrl(workspace))
             setCloudState('saved')
@@ -338,7 +353,7 @@ function App() {
         setGistOwnerLogin(identity.login)
         setCanSyncCloud(true)
         setNeedsRecoveryUpgrade(false)
-        lastSavedSourceRef.current = source
+        markCloudSourceSaved(nextWorkspace, source)
         window.history.replaceState(window.history.state, '', workspaceUrl(nextWorkspace))
         setCloudState('saved')
       } catch (error) {
@@ -371,7 +386,7 @@ function App() {
         body: JSON.stringify({ content: encrypted, description: `nums/${workspace.sqid}` }),
       })
       if (!response.ok) throw new Error('GitHub could not save the workspace.')
-      lastSavedSourceRef.current = sourceSnapshot
+      markCloudSourceSaved(workspace, sourceSnapshot)
       setNeedsRecoveryUpgrade(false)
       setCloudState(sourceSnapshot === currentSourceRef.current ? 'saved' : 'unsaved')
     } catch (error) {
@@ -407,7 +422,7 @@ function App() {
 
         setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : null)
         setNeedsRecoveryUpgrade(!hasOwnerRecovery(encrypted))
-        lastSavedSourceRef.current = remoteSource
+        markCloudSourceSaved(workspace, remoteSource)
         if (remoteSource !== sourceAtStart) setSource(remoteSource)
         setCloudState('saved')
       } catch {
@@ -429,6 +444,7 @@ function App() {
     window.addEventListener('pageshow', refreshCloudWorkbook)
     window.addEventListener('online', refreshCloudWorkbook)
     document.addEventListener('visibilitychange', refreshWhenVisible)
+    refreshCloudWorkbook()
     return () => {
       window.removeEventListener('focus', refreshCloudWorkbook)
       window.removeEventListener('pageshow', refreshCloudWorkbook)
