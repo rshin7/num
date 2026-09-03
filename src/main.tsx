@@ -77,6 +77,14 @@ function cloudSavedSourceStorageKey(workspace: CloudWorkspace): string {
   return `${CLOUD_SAVED_SOURCE_STORAGE_PREFIX}${workspace.gistId}`
 }
 
+function cloudGistUrl(gistId: string): string {
+  const url = new URL('/.netlify/functions/github-gists', window.location.origin)
+  url.searchParams.set('id', gistId)
+  // A distinct URL prevents an intermediary from serving an earlier Gist read.
+  url.searchParams.set('refresh', String(Date.now()))
+  return url.toString()
+}
+
 function initialAutoSync(): boolean {
   return localStorage.getItem(AUTO_SYNC_STORAGE_KEY) !== 'false'
 }
@@ -104,7 +112,7 @@ function App() {
   const [autoSync, setAutoSync] = useState(initialAutoSync)
   const [linkedWorkspace] = useState<CloudWorkspace | null>(readWorkspaceFromLocation)
   const [cloudWorkspace, setCloudWorkspace] = useState<CloudWorkspace | null>(() => linkedWorkspace ?? (readSharedSource() === null ? readStoredWorkspace() : null))
-  const [isLoadingLinkedWorkspace, setIsLoadingLinkedWorkspace] = useState<boolean>(() => Boolean(linkedWorkspace))
+  const [isLoadingLinkedWorkspace, setIsLoadingLinkedWorkspace] = useState<boolean>(() => Boolean(cloudWorkspace))
   const [cloudState, setCloudState] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'unsaved' | 'error'>(() => linkedWorkspace ? 'loading' : 'idle')
   const [canSyncCloud, setCanSyncCloud] = useState(false)
   const [githubIdentity, setGitHubIdentity] = useState<GitHubIdentity | null>(null)
@@ -205,13 +213,13 @@ function App() {
   }, [cloudWorkspace, source, isLoadingLinkedWorkspace])
 
   useEffect(() => {
-    if (!linkedWorkspace) return undefined
-    const workspace = linkedWorkspace
+    if (!cloudWorkspace) return undefined
+    const workspace = cloudWorkspace
     let cancelled = false
 
-    async function loadLinkedWorkspace(): Promise<void> {
+    async function loadCloudWorkspace(): Promise<void> {
       try {
-        const response = await fetch(`/.netlify/functions/github-gists?id=${workspace.gistId}`)
+        const response = await fetch(cloudGistUrl(workspace.gistId), { cache: 'no-store' })
         if (!response.ok) throw new Error('This workspace could not be loaded from GitHub.')
         const gist = await response.json() as { files?: Record<string, { content?: string }>, owner?: { login?: unknown } }
         const encrypted = gist.files?.['num-workbook.enc']?.content
@@ -233,33 +241,9 @@ function App() {
       }
     }
 
-    void loadLinkedWorkspace()
+    void loadCloudWorkspace()
     return () => { cancelled = true }
-  }, [linkedWorkspace])
-
-  useEffect(() => {
-    if (!cloudWorkspace || linkedWorkspace) return undefined
-    const workspace = cloudWorkspace
-    let cancelled = false
-
-    async function loadGistOwner(): Promise<void> {
-      try {
-        const response = await fetch(`/.netlify/functions/github-gists?id=${workspace.gistId}`)
-        if (!response.ok) return
-        const gist = await response.json() as { files?: Record<string, { content?: string }>, owner?: { login?: unknown } }
-        if (!cancelled) {
-          setGistOwnerLogin(typeof gist.owner?.login === 'string' ? gist.owner.login : null)
-          const encrypted = gist.files?.['num-workbook.enc']?.content
-          if (encrypted) setNeedsRecoveryUpgrade(!hasOwnerRecovery(encrypted))
-        }
-      } catch {
-        // Saving will show a useful error if the user explicitly requests it.
-      }
-    }
-
-    void loadGistOwner()
-    return () => { cancelled = true }
-  }, [cloudWorkspace, linkedWorkspace])
+  }, [cloudWorkspace])
 
   useEffect(() => {
     if (!githubIdentity || !cloudWorkspace) return
@@ -296,7 +280,8 @@ function App() {
 
         let legacyWorkspaceFound = false
         for (const candidate of candidates) {
-          const response = await fetch(`/.netlify/functions/github-gists?id=${candidate.id}`)
+          if (typeof candidate.id !== 'string') continue
+          const response = await fetch(cloudGistUrl(candidate.id), { cache: 'no-store' })
           if (!response.ok) continue
           const gist = await response.json() as GitHubGist
           const encrypted = gist.files?.['num-workbook.enc']?.content
@@ -412,7 +397,7 @@ function App() {
     cloudRefreshInFlightRef.current = true
     void (async () => {
       try {
-        const response = await fetch(`/.netlify/functions/github-gists?id=${workspace.gistId}`, { cache: 'no-store' })
+        const response = await fetch(cloudGistUrl(workspace.gistId), { cache: 'no-store' })
         if (!response.ok) return
         const gist = await response.json() as GitHubGist
         const encrypted = gist.files?.['num-workbook.enc']?.content

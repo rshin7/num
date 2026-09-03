@@ -166,7 +166,7 @@ async function githubApiRequest(path: string, init: RequestInit): Promise<Respon
   headers.set('Accept', 'application/vnd.github+json')
   headers.set('X-GitHub-Api-Version', '2022-11-28')
   headers.set('User-Agent', 'num-workbook')
-  return fetch(new URL(path, GITHUB_API_URL), { ...init, headers })
+  return fetch(new URL(path, GITHUB_API_URL), { ...init, cache: 'no-store', headers })
 }
 
 export function sameOrigin(request: Request): boolean {

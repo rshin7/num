@@ -56,7 +56,10 @@ least 32 characters.
 
 After configuration, use **GitHub** in the top-right corner. The first sign-in
 creates one secret Gist for the current workbook; a later sign-in on another
-device finds and opens that same Gist. Subsequent edits update it in place.
+device finds and opens that same Gist. Subsequent edits update it in place;
+each cloud-backed page load fetches the current Gist before using its cached
+browser copy. An open workbook also checks when the browser regains focus.
+Remote changes never replace local unsaved work.
 
 Before upload, the browser encrypts the workbook with AES-GCM. Its share link
 is shaped like `/gist/<id>#<key>`: the short ID finds the Gist, and the fragment
