@@ -3,14 +3,15 @@
 set -euo pipefail
 
 dotnet_dir="$PWD/.dotnet"
+dotnet_sdk_version="10.0.302"
 
-has_dotnet_10() {
-  command -v dotnet >/dev/null 2>&1 && dotnet --list-sdks | awk '$1 ~ /^10\./ { found = 1 } END { exit !found }'
+has_required_dotnet() {
+  command -v dotnet >/dev/null 2>&1 && dotnet --list-sdks | awk -v version="$dotnet_sdk_version" '$1 == version { found = 1 } END { exit !found }'
 }
 
-if ! has_dotnet_10; then
+if ! has_required_dotnet; then
   curl --fail --silent --show-error --location https://dot.net/v1/dotnet-install.sh --output /tmp/dotnet-install.sh
-  bash /tmp/dotnet-install.sh --channel 10.0 --install-dir "$dotnet_dir" --no-path
+  bash /tmp/dotnet-install.sh --version "$dotnet_sdk_version" --install-dir "$dotnet_dir" --no-path
   export PATH="$dotnet_dir:$PATH"
 fi
 
