@@ -19,7 +19,7 @@ export default async function githubGists(request: Request, _context: Context): 
         const { session, refreshedCookie } = await authenticatedSession(request)
         return githubResponse(await githubRequest(session, '/gists?per_page=100'), refreshedCookie)
       }
-      return githubResponse(await publicGitHubRequest(`/gists/${requiredGistId(url)}`))
+      return githubResponse(await publicGitHubRequest(freshGistPath(requiredGistId(url))))
     }
 
     const { session, refreshedCookie } = await authenticatedSession(request)
@@ -69,6 +69,12 @@ function requiredGistId(url: URL): string {
   return gistId
 }
 
+function freshGistPath(gistId: string): string {
+  const url = new URL(`/gists/${gistId}`, 'https://api.github.com')
+  url.searchParams.set('refresh', String(Date.now()))
+  return `${url.pathname}${url.search}`
+}
+
 async function readWorkbook(request: Request): Promise<GistWriteRequest> {
   let body: unknown
   try {
@@ -100,6 +106,8 @@ async function githubResponse(response: Response, refreshedCookie?: string): Pro
   const headers = new Headers({
     'Content-Type': response.headers.get('content-type') || 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
+    'CDN-Cache-Control': 'no-store',
+    'Netlify-CDN-Cache-Control': 'no-store',
   })
   if (refreshedCookie) headers.append('Set-Cookie', refreshedCookie)
   return new Response(await response.text(), { status: response.status, headers })

@@ -10,6 +10,13 @@
   to = "/index.html"
   status = 200
 
+# Never serve a stale application shell after a deployment. Bundled assets use
+# content hashes and can remain cacheable.
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-store"
+
 # The WASM runtime uses stable filenames, so revalidate it after each deploy.
 [[headers]]
   for = "/wasm/_framework/*.wasm"
