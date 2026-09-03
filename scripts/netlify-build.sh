@@ -14,4 +14,7 @@ if ! has_dotnet_10; then
   export PATH="$dotnet_dir:$PATH"
 fi
 
+# The SDK's implicit restore does not reliably fetch the browser-WASM runtime
+# pack on Netlify's fresh Linux image. Restore it explicitly before building.
+MSBuildEnableWorkloadResolver=false DOTNET_CLI_HOME="$PWD/.dotnet-home" dotnet restore src/NumEngine/NumEngine.csproj --runtime browser-wasm
 npm run build
